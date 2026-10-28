@@ -285,7 +285,7 @@ def akun_login(aid):
     conn.close()
     if not acc:
         return redirect(url_for("akun"))
-    urls = {"threads": "https://www.threads.net/login", "instagram": "https://www.instagram.com/accounts/login/",
+    urls = {"threads": "https://www.threads.com/login", "instagram": "https://www.instagram.com/accounts/login/",
             "facebook": "https://www.facebook.com/login/", "x": "https://x.com/login"}
     return render_template("akun_login.html", acc=acc, login_url=urls.get(acc["platform"], "#"), nav="akun")
 

@@ -4,7 +4,7 @@ import time
 import uuid
 
 LOGIN_URLS = {
-    "threads": "https://www.threads.net/login",
+    "threads": "https://www.threads.com/login",
     "instagram": "https://www.instagram.com/accounts/login/",
     "facebook": "https://www.facebook.com/login/",
     "x": "https://x.com/login",

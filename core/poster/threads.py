@@ -6,7 +6,7 @@ def login_check(account):
         browser, ctx, state_path = launch_context(p, account)
         try:
             page = ctx.new_page()
-            page.goto("https://www.threads.net/", timeout=60000)
+            page.goto("https://www.threads.com/", timeout=60000)
             page.wait_for_timeout(3000)
             if "/login" in page.url:
                 raise RuntimeError("sesi mati, dilempar ke halaman login. Klik Login Ulang di detail akun.")

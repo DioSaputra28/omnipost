@@ -6,7 +6,7 @@ PLATFORM_DOMAINS = {
 }
 
 HOME_URLS = {
-    "threads": "https://www.threads.net/",
+    "threads": "https://www.threads.com/",
     "instagram": "https://www.instagram.com/",
     "facebook": "https://www.facebook.com/",
     "x": "https://x.com/home",
