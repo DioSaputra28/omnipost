@@ -306,10 +306,6 @@ def akun_hapus(aid):
 @login_required
 def akun_detail(aid):
     conn = get_conn()
-    cols = [r["name"] for r in conn.execute("PRAGMA table_info(social_accounts)").fetchall()]
-    if "user_agent" not in cols:
-        conn.execute("ALTER TABLE social_accounts ADD COLUMN user_agent TEXT DEFAULT ''")
-        conn.commit()
     acc = conn.execute("SELECT * FROM social_accounts WHERE id=?", (aid,)).fetchone()
     if not acc:
         conn.close()
@@ -360,6 +356,29 @@ def akun_persona(aid):
     conn.commit()
     conn.close()
     flash("persona tersimpan")
+    return redirect(url_for("akun_detail", aid=aid))
+
+@app.route("/akun/<int:aid>/cek-sesi")
+@login_required
+def akun_cek_sesi(aid):
+    from core.session_guard import check_session
+    from datetime import datetime
+    conn = get_conn()
+    acc = conn.execute("SELECT * FROM social_accounts WHERE id=?", (aid,)).fetchone()
+    conn.close()
+    if not acc:
+        return redirect(url_for("akun"))
+    try:
+        ok, msg = check_session(dict(acc), save=True)
+    except Exception as e:  # noqa: BLE001
+        ok, msg = False, str(e)[:300]
+    conn = get_conn()
+    conn.execute("UPDATE social_accounts SET status=?, last_check_at=?, check_error=? WHERE id=?",
+                 ("ok" if ok else "session-expired", datetime.now().isoformat(),
+                  "" if ok else msg, aid))
+    conn.commit()
+    conn.close()
+    flash(("Sesi OK: " if ok else "Sesi bermasalah: ") + msg)
     return redirect(url_for("akun_detail", aid=aid))
 
 @app.route("/persona", methods=["GET"])

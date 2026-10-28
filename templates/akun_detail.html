@@ -11,16 +11,20 @@
 {% if acc.status=='ok' %}<span class="pill pill-ok">Tersambung Aktif</span>
 {% elif acc.status=='paused' %}<span class="pill pill-mut">Paused</span>
 {% elif acc.status=='waiting-login' %}<span class="pill pill-pri">Menunggu Login</span>
+{% elif acc.status=='session-expired' %}<span class="pill pill-err">Sesi Expired</span>
 {% elif acc.status=='error' %}<span class="pill pill-err">Perlu perhatian</span>
 {% else %}<span class="pill pill-mut">{{acc.status}}</span>{% endif %}
 </div>
 <h1 style="font-size:24px">{{acc.label}}</h1>
-<p>{{posted}} terbit, {{failed}} gagal. Terakhir post {{(acc.last_post_at or "-")[:16]}}.</p>
+<p>{{posted}} terbit, {{failed}} gagal. Terakhir post {{(acc.last_post_at or "-")[:16]}}.
+{% if acc.last_check_at %}Terakhir cek sesi {{acc.last_check_at[:16]}}.{% endif %}
+{% if acc.check_error %}<br/><span style="color:var(--err)">{{acc.check_error[:200]}}</span>{% endif %}</p>
 </div>
 <div class="hero-act">
 {% if acc.status=='waiting-login' %}
 <a class="btn btn-pri" style="width:auto" href="/akun/{{acc.id}}/login">Lanjut Login</a>
 {% else %}
+<a class="btn btn-ghost" href="/akun/{{acc.id}}/cek-sesi">Cek Sesi</a>
 <a class="btn btn-ghost" href="/akun/{{acc.id}}/relogin">Login Ulang</a>
 {% endif %}
 <a class="btn btn-ghost" href="/akun/{{acc.id}}/toggle-pause">{% if acc.status=='paused' %}Unpause{% else %}Pause{% endif %}</a>

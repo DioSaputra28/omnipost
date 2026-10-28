@@ -20,7 +20,9 @@ CREATE TABLE IF NOT EXISTS social_accounts (
     status TEXT DEFAULT 'new',
     last_post_at TEXT,
     login_token TEXT DEFAULT '',
-    user_agent TEXT DEFAULT ''
+    user_agent TEXT DEFAULT '',
+    last_check_at TEXT DEFAULT '',
+    check_error TEXT DEFAULT ''
 );
 CREATE TABLE IF NOT EXISTS personas (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -64,6 +66,11 @@ def get_conn():
 def init_db():
     conn = get_conn()
     conn.executescript(SCHEMA)
+    cols = [r["name"] for r in conn.execute("PRAGMA table_info(social_accounts)").fetchall()]
+    for col in ["user_agent", "last_check_at", "check_error", "login_token"]:
+        if col not in cols:
+            conn.execute(f"ALTER TABLE social_accounts ADD COLUMN {col} TEXT DEFAULT ''")
+            conn.commit()
     conn.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('ai_base_url', 'https://api.openai.com/v1')")
     conn.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('ai_api_key', '')")
     conn.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('ai_model', 'gpt-4o-mini')")

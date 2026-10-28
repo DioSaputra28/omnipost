@@ -83,13 +83,35 @@ def run_job_for_account(account_id, manual_product_id=None):
             conn.close()
             return job_id, err
 
+def _backoff_ok(acc, now):
+    err = (acc["check_error"] if "check_error" in acc.keys() else "") or ""
+    last_check = (acc["last_check_at"] if "last_check_at" in acc.keys() else "") or ""
+    if acc["status"] not in ("session-expired", "error") or not last_check:
+        return True
+    try:
+        mins = (now - datetime.fromisoformat(last_check)).total_seconds() / 60
+    except ValueError:
+        return True
+    fails = err.count("sesi mati") + err.count("gagal") + 1
+    wait = min(30 * (2 ** min(fails, 5)), 720)
+    return mins >= wait
+
 def tick():
     now = datetime.now()
     conn = get_conn()
-    accs = conn.execute("SELECT * FROM social_accounts WHERE status != 'paused'").fetchall()
+    cols = [r["name"] for r in conn.execute("PRAGMA table_info(social_accounts)").fetchall()]
+    if "last_check_at" not in cols:
+        conn.execute("ALTER TABLE social_accounts ADD COLUMN last_check_at TEXT DEFAULT ''")
+        conn.commit()
+    if "check_error" not in cols:
+        conn.execute("ALTER TABLE social_accounts ADD COLUMN check_error TEXT DEFAULT ''")
+        conn.commit()
+    accs = conn.execute("SELECT * FROM social_accounts WHERE status NOT IN ('paused','waiting-login','checking','session-expired')").fetchall()
     conn.close()
     for acc in accs:
         if not (acc["active_hour_start"] <= now.hour < acc["active_hour_end"]):
+            continue
+        if not _backoff_ok(acc, now):
             continue
         last = acc["last_post_at"]
         interval_h = 24.0 / max(acc["posts_per_day"] or 3, 1)
@@ -107,7 +129,9 @@ def start_scheduler():
     global _scheduler
     if _scheduler:
         return _scheduler
+    from core.session_guard import refresh_all_sessions
     _scheduler = BackgroundScheduler()
     _scheduler.add_job(tick, "interval", minutes=5)
+    _scheduler.add_job(refresh_all_sessions, "interval", hours=6, kwargs={"max_age_hours": 20})
     _scheduler.start()
     return _scheduler

@@ -8,6 +8,8 @@ def post(account, caption, job_id):
             page = ctx.new_page()
             page.goto("https://x.com/compose/post", timeout=60000)
             page.wait_for_timeout(4000)
+            if "/login" in page.url:
+                raise RuntimeError("sesi mati, dilempar ke halaman login. Klik Login Ulang di detail akun.")
             box = page.locator('div[role="textbox"]').first
             box.fill(caption)
             page.wait_for_timeout(1000)

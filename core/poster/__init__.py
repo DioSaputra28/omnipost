@@ -6,15 +6,10 @@ def post(account, caption, job_id):
         browser, ctx, state_path = launch_context(p, account)
         try:
             page = ctx.new_page()
-            page.goto("https://www.threads.net/login", timeout=60000)
-            page.wait_for_timeout(3000)
-            if "/login" in page.url:
-                page.fill('input[autocomplete="username"]', account.get("username") or "")
-                page.fill('input[type="password"]', account.get("password_enc") or "")
-                page.keyboard.press("Enter")
-                page.wait_for_timeout(5000)
             page.goto("https://www.threads.net/", timeout=60000)
             page.wait_for_timeout(3000)
+            if "/login" in page.url:
+                raise RuntimeError("sesi mati, dilempar ke halaman login. Klik Login Ulang di detail akun.")
             page.keyboard.press("r")
             page.wait_for_timeout(2000)
             page.fill('div[role="textbox"]', caption)
