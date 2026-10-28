@@ -1,6 +1,9 @@
 import functools
 import json
+import logging
 import os
+import traceback
+import sqlite3
 from datetime import datetime
 
 from dotenv import load_dotenv
@@ -8,13 +11,54 @@ load_dotenv()
 
 from flask import Flask, render_template, request, redirect, url_for, session, flash
 from werkzeug.security import generate_password_hash, check_password_hash
+from werkzeug.exceptions import HTTPException, NotFound
 
 from core.db import get_conn, init_db, get_setting, set_setting
 from core.ai import generate_story, _cfg
 from core.scheduler import start_scheduler, run_job_for_account
 
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+log = logging.getLogger("omnipost")
+
 app = Flask(__name__)
 app.secret_key = os.getenv("SECRET_KEY", "dev-secret")
+
+ERROR_LOG = os.path.join(os.path.dirname(os.path.abspath(__file__)), "error.log")
+
+def _log_error(where, e):
+    try:
+        with open(ERROR_LOG, "a") as f:
+            f.write(f"\n[{datetime.now().isoformat()}] {where}: {type(e).__name__}: {e}\n")
+            f.write(traceback.format_exc()[-3000:])
+    except Exception:  # noqa: BLE001
+        pass
+    log.exception("%s", where)
+
+def _friendly(e):
+    msg = str(e)
+    if "Executable doesn't exist" in msg or "Chromium belum terinstall" in msg:
+        return "Browser Chromium belum terinstall. Jalankan: .venv/bin/python -m playwright install chromium"
+    if "Timeout" in type(e).__name__ or "timeout" in msg.lower()[:100]:
+        return "Koneksi ke platform timeout, coba lagi sebentar."
+    if "proxy" in msg.lower()[:200]:
+        return "Proxy bermasalah, cek setting proxy akun ini."
+    if "sesi mati" in msg or "storage_state" in msg or "belum login" in msg:
+        return msg[:300]
+    return "Terjadi kesalahan internal, tim sudah mencatatnya di error.log. Coba lagi."
+
+@app.errorhandler(404)
+def _404(e):  # noqa: ANN001, ANN202
+    return render_template("error.html", code=404, title="Halaman tidak ketemu",
+                           msg="URL yang lu buka nggak ada. Balik ke dashboard aja.", nav=""), 404
+
+@app.errorhandler(500)
+def _500(e):  # noqa: ANN001, ANN202
+    _log_error("500", e)
+    try:
+        return render_template("error.html", code=500, title="Ada yang error",
+                               msg=_friendly(e), nav=""), 500
+    except Exception:  # noqa: BLE001
+        return "Terjadi kesalahan internal. Cek error.log", 500
 
 def login_required(fn):
     @functools.wraps(fn)
@@ -24,28 +68,52 @@ def login_required(fn):
         return fn(*args, **kwargs)
     return wrapper
 
+def _safe_db(fn_name, fn, fallback_redirect="index"):
+    try:
+        return fn()
+    except sqlite3.Error as e:
+        _log_error(fn_name, e)
+        flash("Database error, coba lagi. Detail ada di error.log.")
+        return redirect(url_for(fallback_redirect))
+
 @app.route("/login", methods=["GET", "POST"])
 def login():
-    conn = get_conn()
-    has_user = conn.execute("SELECT COUNT(*) c FROM user").fetchone()["c"]
-    conn.close()
-    if request.method == "POST":
-        u, pw = request.form["username"], request.form["password"]
+    try:
         conn = get_conn()
-        if not has_user:
-            conn.execute("INSERT INTO user (username, password_hash) VALUES (?,?)",
-                         (u, generate_password_hash(pw)))
-            conn.commit()
-            uid = conn.execute("SELECT id FROM user WHERE username=?", (u,)).fetchone()["id"]
-            conn.close()
-            session["uid"] = uid
-            return redirect(url_for("index"))
-        row = conn.execute("SELECT * FROM user WHERE username=?", (u,)).fetchone()
+        has_user = conn.execute("SELECT COUNT(*) c FROM user").fetchone()["c"]
         conn.close()
-        if row and check_password_hash(row["password_hash"], pw):
-            session["uid"] = row["id"]
-            return redirect(url_for("index"))
-        flash("login gagal")
+    except sqlite3.Error as e:
+        _log_error("login/db", e)
+        return render_template("error.html", code=500, title="Database error",
+                               msg="Database tidak bisa dibaca. Coba restart server.", nav=""), 500
+    if request.method == "POST":
+        u, pw = request.form.get("username", ""), request.form.get("password", "")
+        if not u or not pw:
+            flash("isi username dan password dulu")
+            return render_template("login.html", first_run=not has_user)
+        try:
+            conn = get_conn()
+            if not has_user:
+                conn.execute("INSERT INTO user (username, password_hash) VALUES (?,?)",
+                             (u, generate_password_hash(pw)))
+                conn.commit()
+                uid = conn.execute("SELECT id FROM user WHERE username=?", (u,)).fetchone()["id"]
+                conn.close()
+                session["uid"] = uid
+                return redirect(url_for("index"))
+            row = conn.execute("SELECT * FROM user WHERE username=?", (u,)).fetchone()
+            conn.close()
+            if row and check_password_hash(row["password_hash"], pw):
+                session["uid"] = row["id"]
+                return redirect(url_for("index"))
+        except sqlite3.Error as e:
+            _log_error("login/auth", e)
+            flash("Database error saat login, coba lagi.")
+            return render_template("login.html", first_run=False)
+        except (ValueError, KeyError) as e:
+            _log_error("login/form", e)
+            flash("Form tidak valid, coba lagi.")
+    flash("login gagal")
     return render_template("login.html", first_run=not has_user)
 
 @app.route("/logout")
@@ -226,17 +294,30 @@ def akun_cookies(aid):
     conn.close()
     if not acc:
         return redirect(url_for("akun"))
-    from core.poster.base import account_dir
-    import json as js
-    d = account_dir(aid)
-    cookies = js.loads(raw) if raw.strip().startswith("[") else [{"name": "c", "value": raw}]
-    state = {"cookies": cookies, "origins": []}
-    with open(os.path.join(d, "storage_state.json"), "w") as f:
-        js.dump(state, f)
-    conn = get_conn()
-    conn.execute("UPDATE social_accounts SET status='cookies-ok' WHERE id=?", (aid,))
-    conn.commit()
-    conn.close()
+    if not raw.strip():
+        flash("cookies kosong, paste dulu hasil export")
+        return redirect(url_for("akun_detail", aid=aid))
+    try:
+        from core.poster.base import account_dir
+        import json as js
+        d = account_dir(aid)
+        cookies = js.loads(raw) if raw.strip().startswith("[") else [{"name": "c", "value": raw}]
+        state = {"cookies": cookies, "origins": []}
+        with open(os.path.join(d, "storage_state.json"), "w") as f:
+            js.dump(state, f)
+    except (ValueError, OSError) as e:
+        _log_error("akun_cookies", e)
+        flash("Gagal simpan cookies: format tidak valid.")
+        return redirect(url_for("akun_detail", aid=aid))
+    try:
+        conn = get_conn()
+        conn.execute("UPDATE social_accounts SET status='cookies-ok' WHERE id=?", (aid,))
+        conn.commit()
+        conn.close()
+    except sqlite3.Error as e:
+        _log_error("akun_cookies/db", e)
+        flash("Gagal update status akun.")
+        return redirect(url_for("akun_detail", aid=aid))
     flash("cookies tersimpan")
     return redirect(url_for("akun"))
 
@@ -343,18 +424,28 @@ def akun_simpan(aid):
 @app.route("/akun/<int:aid>/persona", methods=["POST"])
 @login_required
 def akun_persona(aid):
-    conn = get_conn()
-    cur = conn.execute("SELECT id FROM personas WHERE account_id=? LIMIT 1", (aid,)).fetchone()
-    if cur:
-        conn.execute("UPDATE personas SET nama=?, gaya_bahasa=?, system_prompt=?, contoh_cerita=? WHERE id=?",
-                     (request.form["nama"], request.form.get("gaya_bahasa", ""),
-                      request.form["system_prompt"], request.form.get("contoh_cerita", ""), cur["id"]))
-    else:
-        conn.execute("INSERT INTO personas (account_id,nama,gaya_bahasa,system_prompt,contoh_cerita) VALUES (?,?,?,?,?)",
-                     (aid, request.form["nama"], request.form.get("gaya_bahasa", ""),
-                      request.form["system_prompt"], request.form.get("contoh_cerita", "")))
-    conn.commit()
-    conn.close()
+    nama = request.form.get("nama", "").strip()
+    sys_prompt = request.form.get("system_prompt", "").strip()
+    if not nama or not sys_prompt:
+        flash("nama persona dan system prompt wajib diisi")
+        return redirect(url_for("akun_detail", aid=aid))
+    try:
+        conn = get_conn()
+        cur = conn.execute("SELECT id FROM personas WHERE account_id=? LIMIT 1", (aid,)).fetchone()
+        if cur:
+            conn.execute("UPDATE personas SET nama=?, gaya_bahasa=?, system_prompt=?, contoh_cerita=? WHERE id=?",
+                         (nama, request.form.get("gaya_bahasa", ""),
+                          sys_prompt, request.form.get("contoh_cerita", ""), cur["id"]))
+        else:
+            conn.execute("INSERT INTO personas (account_id,nama,gaya_bahasa,system_prompt,contoh_cerita) VALUES (?,?,?,?,?)",
+                         (aid, nama, request.form.get("gaya_bahasa", ""),
+                          sys_prompt, request.form.get("contoh_cerita", "")))
+        conn.commit()
+        conn.close()
+    except sqlite3.Error as e:
+        _log_error("akun_persona", e)
+        flash("Gagal simpan persona, coba lagi.")
+        return redirect(url_for("akun_detail", aid=aid))
     flash("persona tersimpan")
     return redirect(url_for("akun_detail", aid=aid))
 
@@ -391,18 +482,37 @@ def persona():
 def produk():
     conn = get_conn()
     if request.method == "POST":
-        if "csv" in request.files and request.files["csv"].filename:
-            import csv, io
-            text = io.StringIO(request.files["csv"].read().decode("utf-8"))
-            for r in csv.DictReader(text):
-                conn.execute("INSERT INTO products (nama,link_shopee,deskripsi,kategori) VALUES (?,?,?,?)",
-                             (r.get("nama", ""), r.get("link_shopee", ""), r.get("deskripsi", ""), r.get("kategori", "")))
-            conn.commit()
-        else:
-            conn.execute("INSERT INTO products (nama,link_shopee,deskripsi,kategori) VALUES (?,?,?,?)",
-                         (request.form["nama"], request.form["link_shopee"],
-                          request.form.get("deskripsi", ""), request.form.get("kategori", "")))
-            conn.commit()
+        try:
+            if "csv" in request.files and request.files["csv"].filename:
+                import csv, io
+                try:
+                    text = io.StringIO(request.files["csv"].read().decode("utf-8"))
+                except UnicodeDecodeError:
+                    flash("file CSV harus UTF-8")
+                    conn.close()
+                    return render_template("produk.html", rows=conn.execute("SELECT * FROM products ORDER BY id DESC").fetchall(), nav="produk")
+                n = 0
+                for r in csv.DictReader(text):
+                    if not (r.get("nama") or "").strip() or not (r.get("link_shopee") or "").strip():
+                        continue
+                    conn.execute("INSERT INTO products (nama,link_shopee,deskripsi,kategori) VALUES (?,?,?,?)",
+                                 (r.get("nama", ""), r.get("link_shopee", ""), r.get("deskripsi", ""), r.get("kategori", "")))
+                    n += 1
+                conn.commit()
+                flash(f"{n} produk diimport dari CSV")
+            else:
+                nama = request.form.get("nama", "").strip()
+                link = request.form.get("link_shopee", "").strip()
+                if not nama or not link:
+                    flash("nama dan link Shopee wajib diisi")
+                else:
+                    conn.execute("INSERT INTO products (nama,link_shopee,deskripsi,kategori) VALUES (?,?,?,?)",
+                                 (nama, link, request.form.get("deskripsi", ""), request.form.get("kategori", "")))
+                    conn.commit()
+                    flash("produk ditambahkan")
+        except sqlite3.Error as e:
+            _log_error("produk", e)
+            flash("Gagal simpan produk, coba lagi.")
     rows = conn.execute("SELECT * FROM products ORDER BY id DESC").fetchall()
     conn.close()
     return render_template("produk.html", rows=rows, nav="produk")
@@ -417,15 +527,24 @@ def generate():
     prods = conn.execute("SELECT * FROM products WHERE aktif=1").fetchall()
     conn.close()
     if request.method == "POST":
-        aid, pid = int(request.form["account_id"]), int(request.form["product_id"])
+        try:
+            aid, pid = int(request.form.get("account_id", 0)), int(request.form.get("product_id", 0))
+        except (TypeError, ValueError):
+            flash("pilih akun dan produk yang valid")
+            return render_template("generate.html", accs=accs, prods=prods, out=None,
+                                   picked_aid=None, picked_pid=None, nav="gen")
         picked_aid, picked_pid = aid, pid
         conn = get_conn()
         per = conn.execute("SELECT * FROM personas WHERE account_id=? LIMIT 1", (aid,)).fetchone()
         prod = conn.execute("SELECT * FROM products WHERE id=?", (pid,)).fetchone()
         conn.close()
         if per and prod:
-            out = generate_story(per["system_prompt"], per["gaya_bahasa"], per["contoh_cerita"],
-                                 prod["nama"], prod["deskripsi"], prod["link_shopee"])
+            try:
+                out = generate_story(per["system_prompt"], per["gaya_bahasa"], per["contoh_cerita"],
+                                     prod["nama"], prod["deskripsi"], prod["link_shopee"])
+            except Exception as e:  # noqa: BLE001
+                _log_error("generate", e)
+                flash("Gagal generate: " + _friendly(e))
         else:
             flash("akun ini belum punya persona / produk tidak ketemu")
     return render_template("generate.html", accs=accs, prods=prods, out=out,
@@ -434,7 +553,23 @@ def generate():
 @app.route("/post-now", methods=["POST"])
 @login_required
 def post_now():
-    jid, err = run_job_for_account(int(request.form["account_id"]), int(request.form.get("product_id") or 0) or None)
+    try:
+        aid = int(request.form.get("account_id", 0) or 0)
+    except (TypeError, ValueError):
+        flash("pilih akun dulu")
+        return redirect(url_for("index"))
+    try:
+        pid_raw = request.form.get("product_id") or ""
+        pid = int(pid_raw) if pid_raw.strip() else None
+    except (TypeError, ValueError):
+        flash("product_id tidak valid")
+        return redirect(url_for("index"))
+    try:
+        jid, err = run_job_for_account(aid, pid)
+    except Exception as e:  # noqa: BLE001
+        _log_error("post-now", e)
+        flash("Gagal posting: " + _friendly(e))
+        return redirect(url_for("index"))
     flash(f"job #{jid} gagal: {err}" if err else f"job #{jid} posted!")
     return redirect(url_for("index"))
 
@@ -451,7 +586,8 @@ def setting_ai():
                 generate_story("Kamu asisten.", "santai", "-", "Teh test", "produk dummy", "https://shopee.co.id/x")
                 flash(f"koneksi OK ke {base_url} model {model}")
             except Exception as e:  # noqa: BLE001
-                flash(f"test gagal: {e}")
+                _log_error("setting-ai/test", e)
+                flash("Test gagal: " + _friendly(e))
         else:
             flash("setting AI tersimpan")
         return redirect(url_for("setting_ai"))
@@ -485,12 +621,27 @@ def jadwal():
 @app.route("/jadwal/<int:aid>", methods=["POST"])
 @login_required
 def jadwal_save(aid):
-    conn = get_conn()
-    conn.execute("UPDATE social_accounts SET posts_per_day=?, active_hour_start=?, active_hour_end=? WHERE id=?",
-                 (int(request.form["posts_per_day"]), int(request.form["hour_start"]),
-                  int(request.form["hour_end"]), aid))
-    conn.commit()
-    conn.close()
+    try:
+        ppd = int(request.form.get("posts_per_day", 3) or 3)
+        hs = int(request.form.get("hour_start", 7) or 7)
+        he = int(request.form.get("hour_end", 21) or 21)
+    except (TypeError, ValueError):
+        flash("angka jadwal tidak valid")
+        return redirect(url_for("jadwal"))
+    if not (1 <= ppd <= 50) or not (0 <= hs <= 23) or not (0 <= he <= 24) or hs >= he:
+        flash("jadwal tidak masuk akal: post 1-50/hari, jam 0-24, mulai < selesai")
+        return redirect(url_for("jadwal"))
+    try:
+        conn = get_conn()
+        conn.execute("UPDATE social_accounts SET posts_per_day=?, active_hour_start=?, active_hour_end=? WHERE id=?",
+                     (ppd, hs, he, aid))
+        conn.commit()
+        conn.close()
+    except sqlite3.Error as e:
+        _log_error("jadwal_save", e)
+        flash("Gagal simpan jadwal, coba lagi.")
+        return redirect(url_for("jadwal"))
+    flash("jadwal tersimpan")
     return redirect(url_for("jadwal"))
 
 if __name__ == "__main__":

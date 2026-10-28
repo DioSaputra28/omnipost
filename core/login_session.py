@@ -23,16 +23,26 @@ def _account_dir(account_id):
     from core.poster.base import account_dir
     return account_dir(account_id)
 
-def start_login_session(platform, label, proxy=""):
+def start_login_session(platform, label, proxy="", headless=False):
+    if platform not in LOGIN_URLS:
+        raise ValueError(f"platform tidak dikenal: {platform}")
+    from core.poster.base import launch_browser
     pw_mod = _playwright()
     token = uuid.uuid4().hex[:12]
     p = pw_mod().start()
-    proxy_kw = {"server": proxy} if proxy else None
-    browser = p.chromium.launch(headless=False, proxy=proxy_kw)
+    try:
+        proxy_kw = {"server": proxy} if proxy else None
+        browser = launch_browser(p, proxy_kw, headless=headless)
+        ctx = browser.new_context()
+        page = ctx.new_page()
+        page.goto(LOGIN_URLS[platform], timeout=60000)
+    except Exception:
+        try:
+            p.stop()
+        except Exception:  # noqa: BLE001
+            pass
+        raise
     persistent_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "storage", "_login_" + token)
-    ctx = browser.new_context()
-    page = ctx.new_page()
-    page.goto(LOGIN_URLS[platform], timeout=60000)
     with _lock:
         SESSIONS[token] = {
             "platform": platform, "label": label, "proxy": proxy,

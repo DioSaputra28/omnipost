@@ -16,16 +16,17 @@ def _find_chrome():
             return c
     return None
 
-def launch_browser(p, proxy=None):
+def launch_browser(p, proxy=None, headless=None):
+    use_headless = HEADLESS if headless is None else headless
     try:
-        return p.chromium.launch(headless=HEADLESS, proxy=proxy)
+        return p.chromium.launch(headless=use_headless, proxy=proxy)
     except Exception as e:  # noqa: BLE001
         if "Executable doesn't exist" not in str(e):
             raise
         exe = _find_chrome()
         if not exe:
             raise RuntimeError("Chromium belum terinstall. Jalankan: .venv/bin/python -m playwright install chromium (butuh internet ~150MB). Kalau gagal download, install chromium sistem: sudo apt install chromium.")
-        return p.chromium.launch(headless=HEADLESS, proxy=proxy, executable_path=exe)
+        return p.chromium.launch(headless=use_headless, proxy=proxy, executable_path=exe)
 
 def account_dir(account_id):
     d = os.path.join(STORAGE_ROOT, str(account_id))

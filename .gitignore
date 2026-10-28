@@ -1,5 +1,6 @@
 .env
 db.sqlite
+error.log
 __pycache__/
 *.pyc
 storage/
