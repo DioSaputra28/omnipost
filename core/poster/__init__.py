@@ -1,5 +1,7 @@
 from playwright.sync_api import sync_playwright
 from core.poster.base import launch_context, save_state_and_shot
+import logging as _logging
+log = _logging.getLogger("omnipost")
 
 def _debug_shot(ctx, account_id, job_id, tag):
     import os
@@ -76,11 +78,31 @@ def post(account, caption, job_id):
             box.click()
             page.wait_for_timeout(500)
             try:
-                box.fill("")
+                box.click()
+                page.keyboard.press("ControlOrMeta+a")
+                page.keyboard.press("Backspace")
+                page.wait_for_timeout(400)
             except Exception:  # noqa: BLE001
                 pass
-            box.fill(caption)
-            page.wait_for_timeout(2500)
+            import re as _re
+            m = _re.search(r"https?://\S+", caption)
+            link = m.group(0).rstrip(".,!?)") if m else ""
+            text_only = _re.sub(r"https?://\S+", "", caption).strip()
+            text_only = _re.sub(r"\s{2,}", " ", text_only)
+            if not text_only:
+                text_only = "Hari ini nemu barang bagus, cek komen buat linknya"
+            try:
+                box.click()
+                for chunk in [text_only[i:i + 40] for i in range(0, len(text_only), 40)]:
+                    page.keyboard.type(chunk, delay=15)
+                    page.wait_for_timeout(120)
+                page.wait_for_timeout(1200)
+            except Exception:  # noqa: BLE001
+                try:
+                    box.fill(text_only)
+                    page.wait_for_timeout(1200)
+                except Exception:  # noqa: BLE001
+                    pass
             try:
                 if page.locator('text="Who can reply and quote"').count():
                     page.keyboard.press("Escape")
@@ -97,44 +119,41 @@ def post(account, caption, job_id):
                 except Exception:  # noqa: BLE001
                     pass
             scope_prev = dialog if dialog else page
-            preview_closed = False
             try:
-                cards = scope_prev.locator('div:has(a[href*="shopee"]), div:has(a[href*="tokopedia"])').all()
-                for card in cards:
+                x_btn = None
+                for b in scope_prev.locator('button, div[role="button"]').all():
                     try:
-                        if not card.is_visible():
+                        if not b.is_visible():
                             continue
-                        bb = card.bounding_box()
-                        if not bb or bb["width"] < 200:
+                        bbx = b.bounding_box()
+                        if not bbx:
                             continue
-                        cx, cy = bb["x"] + bb["width"] - 24, bb["y"] + 24
-                        clicked = False
-                        for b in card.locator('button, div[role="button"]').all():
+                        w, h = bbx["width"], bbx["height"]
+                        if 18 <= w <= 34 and 18 <= h <= 34:
                             try:
-                                if not b.is_visible():
-                                    continue
-                                bbx = b.bounding_box()
-                                if bbx and abs(bbx["x"] + bbx["width"] / 2 - cx) < 60 and abs(bbx["y"] + bbx["height"] / 2 - cy) < 60:
-                                    b.click()
-                                    clicked = True
-                                    break
+                                txt = (b.inner_text() or "").strip()
                             except Exception:  # noqa: BLE001
-                                pass
-                        if not clicked:
+                                txt = ""
+                            if txt:
+                                continue
                             try:
-                                page.mouse.click(cx, cy)
+                                svg = b.locator("svg").count()
                             except Exception:  # noqa: BLE001
-                                pass
-                        page.wait_for_timeout(800)
-                        preview_closed = True
-                        break
+                                svg = 0
+                            x_btn = (b, bbx, svg)
+                            break
                     except Exception:  # noqa: BLE001
                         pass
+                if x_btn:
+                    try:
+                        x_btn[0].click()
+                        page.wait_for_timeout(800)
+                    except Exception:  # noqa: BLE001
+                        page.mouse.click(x_btn[1]["x"] + x_btn[1]["width"] / 2,
+                                          x_btn[1]["y"] + x_btn[1]["height"] / 2)
+                        page.wait_for_timeout(800)
             except Exception:  # noqa: BLE001
                 pass
-            if preview_closed:
-                page.keyboard.press("Escape")
-                page.wait_for_timeout(600)
             page.wait_for_timeout(1000)
             dialog = None
             for sel in ['div[role="dialog"]', 'div[aria-modal="true"]']:
@@ -147,24 +166,32 @@ def post(account, caption, job_id):
                     pass
             posted = False
             scope = dialog if dialog else page
-            try:
-                cands = scope.locator("button").filter(has_text=re.compile(r"^\s*Post\s*$")).all()
-                best, best_y, best_x = None, -1, -1
-                for c in cands:
-                    try:
-                        if not (c.is_visible() and c.is_enabled()):
-                            continue
-                        bb = c.bounding_box()
-                        y, x = (bb["y"], bb["x"]) if bb else (0, 0)
-                        if (y, x) >= (best_y, best_x):
-                            best, best_y, best_x = c, y, x
-                    except Exception:  # noqa: BLE001
-                        pass
-                if best:
+            best = None
+            for _ in range(6):
+                try:
+                    cands = scope.locator("button").filter(has_text=re.compile(r"^\s*Post\s*$")).all()
+                    best, best_y, best_x = None, -1, -1
+                    for c in cands:
+                        try:
+                            if not (c.is_visible() and c.is_enabled()):
+                                continue
+                            bb = c.bounding_box()
+                            y, x = (bb["y"], bb["x"]) if bb else (0, 0)
+                            if (y, x) >= (best_y, best_x):
+                                best, best_y, best_x = c, y, x
+                        except Exception:  # noqa: BLE001
+                            pass
+                    if best:
+                        break
+                except Exception:  # noqa: BLE001
+                    pass
+                page.wait_for_timeout(2000)
+            if best:
+                try:
                     best.click()
                     posted = True
-            except Exception:  # noqa: BLE001
-                pass
+                except Exception:  # noqa: BLE001
+                    pass
             if not posted:
                 try:
                     (dialog or page).keyboard.press("Control+Enter")
@@ -195,7 +222,7 @@ def post(account, caption, job_id):
                         except Exception:  # noqa: BLE001
                             still_open = False
                     else:
-                        still_open = page.locator('div[role="textbox"]:has-text("%s")' % caption[:20]).count() > 0
+                        still_open = page.locator('div[role="textbox"]:has-text("%s")' % text_only[:20]).count() > 0
                 if still_open:
                     _debug_shot(ctx, account["id"], job_id, "not-posted")
                     raise RuntimeError(
@@ -205,6 +232,75 @@ def post(account, caption, job_id):
                 raise
             except Exception:  # noqa: BLE001
                 pass
+            if link:
+                try:
+                    page.wait_for_timeout(4000)
+                    page.goto("https://www.threads.com/@" + (account.get("label") or "").split("|")[0].strip().replace(" ", ""), timeout=60000)
+                    page.wait_for_timeout(5000)
+                    clicked_reply = False
+                    arts = page.locator("article").all()
+                    for art in arts[:3]:
+                        try:
+                            if not art.is_visible():
+                                continue
+                            for sel in ['a[aria-label*="Reply" i]', 'a[href*="/reply" i]',
+                                        'button[aria-label*="Reply" i]', 'div[role="button"][aria-label*="Reply" i]']:
+                                for el in art.locator(sel).all()[:2]:
+                                    try:
+                                        if el.is_visible():
+                                            el.click()
+                                            clicked_reply = True
+                                            break
+                                    except Exception:  # noqa: BLE001
+                                        pass
+                                if clicked_reply:
+                                    break
+                        except Exception:  # noqa: BLE001
+                            pass
+                        if clicked_reply:
+                            break
+                    if not clicked_reply:
+                        page.keyboard.press("r")
+                    page.wait_for_timeout(2500)
+                    rbox = None
+                    for sel in ['div[role="textbox"]', '[contenteditable="true"]']:
+                        try:
+                            loc = page.locator(sel).first
+                            loc.wait_for(state="visible", timeout=8000)
+                            rbox = loc
+                            break
+                        except Exception:  # noqa: BLE001
+                            pass
+                    if rbox:
+                        rbox.click()
+                        page.wait_for_timeout(500)
+                        for chunk in [link[i:i + 40] for i in range(0, len(link), 40)]:
+                            page.keyboard.type(chunk, delay=15)
+                            page.wait_for_timeout(120)
+                        page.wait_for_timeout(2500)
+                        posted2 = False
+                        for _ in range(6):
+                            try:
+                                rc = page.locator("button").filter(has_text=re.compile(r"^\s*Reply\s*$")).all()
+                                rbest = None
+                                for c in rc:
+                                    try:
+                                        if c.is_visible() and c.is_enabled():
+                                            rbest = c
+                                            break
+                                    except Exception:  # noqa: BLE001
+                                        pass
+                                if rbest:
+                                    rbest.click()
+                                    posted2 = True
+                                    break
+                            except Exception:  # noqa: BLE001
+                                pass
+                            page.wait_for_timeout(2000)
+                        page.wait_for_timeout(4000)
+                        log.info("reply link: %s", "OK" if posted2 else "GAGAL")
+                except Exception as e:  # noqa: BLE001
+                    log.info("reply link skip: %s", str(e)[:150])
             shot = save_state_and_shot(ctx, state_path, account["id"], job_id)
             return shot
         finally:
