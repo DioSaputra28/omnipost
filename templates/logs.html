@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}Log Error - Omnipost{% endblock %}
+{% block htitle %}Log Error{% endblock %}
+{% block hsub %}Tiap 500 tercatat dengan ID, konteks request, dan traceback{% endblock %}
+{% from "base.html" import icon %}
+{% block body %}
+<section class="hero">
+<div>
+<h1 style="font-size:24px">Log Error ({{entries|length}} terakhir)</h1>
+<p>Format file: <span class="mono">error.log</span> (rotate otomatis 2MB, 3 backup). Tiap baris: timestamp, ID, lokasi, tipe, pesan, konteks request, traceback.</p>
+</div>
+<div class="hero-act">
+<a class="btn btn-ghost" href="/logs?level={% if level=='server' %}error{% else %}server{% endif %}">{% if level=='server' %}Lihat Error Terstruktur{% else %}Lihat Raw Server Log{% endif %}</a>
+<form class="f" method="post" action="/logs/clear" onsubmit="return confirm('Kosongkan error.log?')" style="margin:0">
+<button class="btn btn-ghost btn-sm" style="color:var(--err)">Kosongkan</button>
+</form>
+</div>
+</section>
+
+{% if level=='server' %}
+<div class="card">
+<h2>{{ icon('document-text') }} Raw error.log (300 baris terakhir)</h2>
+<p class="sub">Isi mentah file, termasuk error scheduler background (tanpa request).</p>
+<pre class="mono" style="white-space:pre-wrap;max-height:600px;overflow:auto">{{raw}}</pre>
+</div>
+{% else %}
+<div class="card">
+<h2>{{ icon('document-text') }} Error Terstruktur</h2>
+<p class="sub">Klik ID buat lihat traceback lengkap + konteks request-nya.</p>
+<table class="tbl"><tr><th>ID</th><th>Waktu</th><th>Lokasi</th><th>Tipe</th><th>Pesan</th><th>Konteks</th></tr>
+{% for e in entries %}<tr><td><a href="/logs/{{e.id}}">{{e.id}}</a></td><td class="mono">{{e.ts[:19]}}</td><td>{{e.where}}</td><td>{{e.type}}</td><td><div class="clip">{{e.msg}}</div></td><td class="mono">{{e.ctx}}</td></tr>
+{% else %}<tr><td colspan="6">Belum ada error tercatat. Bagus.</td></tr>{% endfor %}
+</table>
+</div>
+{% endif %}
+{% endblock %}

@@ -23,16 +23,23 @@ log = logging.getLogger("omnipost")
 app = Flask(__name__)
 app.secret_key = os.getenv("SECRET_KEY", "dev-secret")
 
-ERROR_LOG = os.path.join(os.path.dirname(os.path.abspath(__file__)), "error.log")
+def _req_ctx():
+    try:
+        return f"{request.method} {request.path} ip={request.remote_addr}"
+    except Exception:  # noqa: BLE001
+        return ""
 
 def _log_error(where, e):
+    from core.errorlog import log_error
+    eid = log_error(where, e, ctx=_req_ctx())
+    log.exception("%s [%s]", where, eid)
+    return eid
+
+def _req_ctx_safe():
     try:
-        with open(ERROR_LOG, "a") as f:
-            f.write(f"\n[{datetime.now().isoformat()}] {where}: {type(e).__name__}: {e}\n")
-            f.write(traceback.format_exc()[-3000:])
+        return f"{request.method} {request.path}"
     except Exception:  # noqa: BLE001
-        pass
-    log.exception("%s", where)
+        return ""
 
 def _friendly(e):
     msg = str(e)
@@ -44,21 +51,7 @@ def _friendly(e):
         return "Proxy bermasalah, cek setting proxy akun ini."
     if "sesi mati" in msg or "storage_state" in msg or "belum login" in msg:
         return msg[:300]
-    return "Terjadi kesalahan internal, tim sudah mencatatnya di error.log. Coba lagi."
-
-@app.errorhandler(404)
-def _404(e):  # noqa: ANN001, ANN202
-    return render_template("error.html", code=404, title="Halaman tidak ketemu",
-                           msg="URL yang lu buka nggak ada. Balik ke dashboard aja.", nav=""), 404
-
-@app.errorhandler(500)
-def _500(e):  # noqa: ANN001, ANN202
-    _log_error("500", e)
-    try:
-        return render_template("error.html", code=500, title="Ada yang error",
-                               msg=_friendly(e), nav=""), 500
-    except Exception:  # noqa: BLE001
-        return "Terjadi kesalahan internal. Cek error.log", 500
+    return "Terjadi kesalahan internal, sudah tercatat di Log Error. Coba lagi."
 
 def login_required(fn):
     @functools.wraps(fn)
@@ -67,6 +60,54 @@ def login_required(fn):
             return redirect(url_for("login"))
         return fn(*args, **kwargs)
     return wrapper
+
+@app.route("/logs")
+@login_required
+def logs():
+    from core.errorlog import read_entries, tail_raw
+    level = request.args.get("level", "error")
+    entries = read_entries(limit=100)
+    if level == "server":
+        return render_template("logs.html", nav="logs", level=level, entries=[], raw=tail_raw(300))
+    return render_template("logs.html", nav="logs", level="error", entries=entries, raw="")
+
+@app.route("/logs/<eid>")
+@login_required
+def log_detail(eid):
+    from core.errorlog import get_entry
+    e = get_entry(eid)
+    if not e:
+        flash("log tidak ketemu (mungkin sudah di-rotate)")
+        return redirect(url_for("logs"))
+    return render_template("log_detail.html", nav="logs", e=e)
+
+@app.route("/logs/clear", methods=["POST"])
+@login_required
+def logs_clear():
+    from core.errorlog import clear_log
+    clear_log()
+    flash("error.log dikosongkan")
+    return redirect(url_for("logs"))
+
+def _req_ctx_safe():
+    try:
+        return f"{request.method} {request.path}"
+    except Exception:  # noqa: BLE001
+        return ""
+
+@app.errorhandler(404)
+def _404(e):  # noqa: ANN001, ANN202
+    return render_template("error.html", code=404, title="Halaman tidak ketemu",
+                           msg="URL yang lu buka nggak ada. Balik ke dashboard aja.", nav=""), 404
+
+@app.errorhandler(500)
+def _500(e):  # noqa: ANN001, ANN202
+    eid = _log_error("500 " + _req_ctx_safe(), e)
+    try:
+        return render_template("error.html", code=500, title="Ada yang error",
+                               msg="Terjadi kesalahan internal (kode %s). Sudah tercatat, buka halaman Log Error buat detailnya." % eid, nav=""), 500
+    except Exception:  # noqa: BLE001
+        return "Terjadi kesalahan internal [%s]. Cek error.log" % eid, 500
 
 def _safe_db(fn_name, fn, fallback_redirect="index"):
     try:

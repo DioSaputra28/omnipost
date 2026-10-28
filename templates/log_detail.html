@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}Detail {{e.id}} - Omnipost{% endblock %}
+{% block htitle %}Detail Error {{e.id}}{% endblock %}
+{% block hsub %}<a href="/logs" style="color:var(--ter)">kembali ke log</a>{% endblock %}
+{% from "base.html" import icon %}
+{% block body %}
+<div class="card">
+<h2>{{ icon('x-circle') }} {{e.type}} di {{e.where}}</h2>
+<p class="sub">{{e.ts}}</p>
+<table class="tbl">
+<tr><th style="width:140px">ID</th><td class="mono">{{e.id}}</td></tr>
+<tr><th>Pesan</th><td>{{e.msg}}</td></tr>
+<tr><th>Konteks request</th><td class="mono">{{e.ctx or "-"}}</td></tr>
+</table>
+<h2 style="margin-top:16px">{{ icon('document-text') }} Traceback</h2>
+<pre class="mono" style="white-space:pre-wrap;max-height:500px;overflow:auto">{{e.tb|join('\n') or "(tidak ada traceback)"}}</pre>
+</div>
+{% endblock %}
