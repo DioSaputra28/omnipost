@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% block title %}Detail {{acc.label}} - Omnipost{% endblock %}
+{% block htitle %}{{acc.label}}{% endblock %}
+{% block hsub %}{{acc.platform}} - <a href="/akun" style="color:var(--ter)">kembali ke list akun</a>{% endblock %}
+{% from "base.html" import icon %}
+{% block body %}
+<section class="hero">
+<div>
+<div style="display:flex;gap:8px;margin-bottom:10px">
+<span class="acct-plat">{{ icon('link') }}{{acc.platform}}</span>
+{% if acc.status=='ok' %}<span class="pill pill-ok">Tersambung Aktif</span>
+{% elif acc.status=='paused' %}<span class="pill pill-mut">Paused</span>
+{% elif acc.status=='waiting-login' %}<span class="pill pill-pri">Menunggu Login</span>
+{% elif acc.status=='error' %}<span class="pill pill-err">Perlu perhatian</span>
+{% else %}<span class="pill pill-mut">{{acc.status}}</span>{% endif %}
+</div>
+<h1 style="font-size:24px">{{acc.label}}</h1>
+<p>{{posted}} terbit, {{failed}} gagal. Terakhir post {{(acc.last_post_at or "-")[:16]}}.</p>
+</div>
+<div class="hero-act">
+{% if acc.status=='waiting-login' %}
+<a class="btn btn-pri" style="width:auto" href="/akun/{{acc.id}}/login">Lanjut Login</a>
+{% else %}
+<a class="btn btn-ghost" href="/akun/{{acc.id}}/relogin">Login Ulang</a>
+{% endif %}
+<a class="btn btn-ghost" href="/akun/{{acc.id}}/toggle-pause">{% if acc.status=='paused' %}Unpause{% else %}Pause{% endif %}</a>
+</div>
+</section>
+
+<div class="grid2">
+<div style="display:flex;flex-direction:column;gap:24px">
+<div class="card">
+<h2>{{ icon('identification') }} Persona</h2>
+<p class="sub">Gaya cerita AI khusus akun ini. 1 akun = 1 persona.</p>
+<form class="f" method="post" action="/akun/{{acc.id}}/persona">
+<label class="lb">Nama persona</label><input class="in" name="nama" value="{{persona.nama if persona else ''}}" placeholder="mis: emak-emak santai" required/>
+<label class="lb">Gaya bahasa</label><input class="in" name="gaya_bahasa" value="{{persona.gaya_bahasa if persona else ''}}" placeholder="mis: santai, ceplas-ceplos"/>
+<label class="lb">System prompt</label><textarea class="in" name="system_prompt" rows="4" placeholder="kamu adalah ... yang cerita natural..." required>{{persona.system_prompt if persona else ''}}</textarea>
+<label class="lb">Contoh cerita (few-shot)</label><textarea class="in" name="contoh_cerita" rows="4">{{persona.contoh_cerita if persona else ''}}</textarea>
+<button class="btn btn-pri" style="width:auto">Simpan Persona</button>
+</form>
+</div>
+<div class="card">
+<h2>{{ icon('queue-list') }} Riwayat Postingan</h2>
+<p class="sub">20 job terakhir akun ini.</p>
+<table class="tbl"><tr><th>ID</th><th>Produk</th><th>Status</th><th>Caption</th></tr>
+{% for j in jobs %}<tr><td>{{j.id}}</td><td>{{j.nama}}</td><td>{% if j.status=='posted' %}<span class="pill pill-ok">Terbit</span>{% elif j.status=='failed' %}<span class="pill pill-err">Gagal</span>{% else %}<span class="pill pill-mut">{{j.status}}</span>{% endif %}</td><td><div class="clip">{{j.caption_hasil_ai}}</div></td></tr>{% else %}<tr><td colspan="4">Belum ada.</td></tr>{% endfor %}
+</table>
+</div>
+</div>
+<div style="display:flex;flex-direction:column;gap:24px">
+<div class="card">
+<h2>{{ icon('cog-6-tooth') }} Pengaturan Akun</h2>
+<p class="sub">Label, proxy, user-agent browser, dan jadwal.</p>
+<form class="f" method="post" action="/akun/{{acc.id}}/simpan">
+<label class="lb">Label</label><input class="in" name="label" value="{{acc.label}}" required/>
+<label class="lb">Proxy</label><input class="in" name="proxy" value="{{acc.proxy or ''}}" placeholder="http://user:pass@host:port"/>
+<label class="lb">User-Agent browser</label>
+<select class="in" name="user_agent">
+<option value="">Default Chromium (tanpa custom UA)</option>
+{% for nama, ua in user_agents %}
+<option value="{{ua}}" {% if acc.user_agent==ua %}selected{% endif %}>{{nama}}{% if ua in ua_used %} - dipakai: {{ua_used[ua]|join(', ')}}{% endif %}</option>
+{% endfor %}
+</select>
+<p class="sub">UA yang sudah dipakai akun lain ditandai biar nggak dobel. Tiap postingan + login akun ini pakai UA yang dipilih.</p>
+<div class="frow">
+<div><label class="lb">Post/hari</label><input class="in" name="posts_per_day" type="number" value="{{acc.posts_per_day}}"/></div>
+<div><label class="lb">Jam mulai</label><input class="in" name="hour_start" type="number" value="{{acc.active_hour_start}}"/></div>
+<div><label class="lb">Jam selesai</label><input class="in" name="hour_end" type="number" value="{{acc.active_hour_end}}"/></div>
+</div>
+<button class="btn btn-pri" style="width:auto">Simpan Pengaturan</button>
+</form>
+</div>
+<div class="card">
+<h2 style="color:var(--err)">Zona Berbahaya</h2>
+<p class="sub">Hapus akun ini beserta persona, jobs, dan sesinya.</p>
+<form class="f" method="post" action="/akun/{{acc.id}}/hapus" onsubmit="return confirm('Hapus akun {{acc.label}}?')">
+<button class="btn btn-ghost btn-sm" style="color:var(--err);width:auto">Hapus Akun Ini</button>
+</form>
+</div>
+</div>
+</div>
+{% endblock %}

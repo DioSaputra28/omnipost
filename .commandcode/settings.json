@@ -1,0 +1,40 @@
+{
+  "permissions": {
+    "allow": [
+      "Shell(pip:*)",
+      "Shell(python3 -c from core.db import init_db; init_db(); print('db ready'))",
+      "Shell(python3 -m pip install flask python-dotenv apscheduler openai 2 >& 1)",
+      "Shell(ls /home/dio/Project-Coding/omnipost/.venv 2>/dev/null; which uv pip3 poetry 2>/dev/null; ls /usr/local/bin | head -20; apt list --installed 2>/dev/null | grep -i python | head)",
+      "Shell(ls /usr/bin/python* /usr/local/bin/python* 2>/dev/null; ls ~/.venv* /opt 2>/dev/null; find / -maxdepth 4 -name \"pip*\" -type f 2>/dev/null | head -5; python3 --version)",
+      "Shell(python3 -m ensurepip 2 >& 1)",
+      "Shell(sudo apt install -y python3-pip 2 >& 1)",
+      "Shell(sudo apt update -qq)",
+      "Shell(sudo apt install -y -qq python3-pip python3-venv 2 >& 1)",
+      "Shell(python3 -m venv --help 2 >& 1)",
+      "Shell(curl -LsSf https://astral.sh/uv/install.sh -o /tmp/uv-install.sh)",
+      "Shell(sh /tmp/uv-install.sh 2 >& 1)",
+      "Shell(export:*)",
+      "Shell(uv:*)",
+      "Shell(.venv/bin/python:*)",
+      "Shell(cp:*)",
+      "Shell(tee:*)",
+      "Shell(curl -s -o /dev/null -w \"%{http_code}\" http://127.0.0.1:5000/login)",
+      "Shell(cat:*)",
+      "Shell(sed:*)",
+      "Shell(mkdir:*)",
+      "Shell(for:*)",
+      "Shell(do:*)",
+      "Shell(done:*)",
+      "Shell(curl -s -A Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/120 Safari/537.36 https://fonts.googleapis.com/css2?family=Josefin+Sans:wght@400;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap -o /tmp/fonts.css)",
+      "Shell(grep:*)",
+      "Shell(curl -s -o josefin-sans-400-700.woff2 https://fonts.gstatic.com/s/josefinsans/v34/Qw3aZQNVED7rKGKxtqIqX5EUDXx4.woff2)",
+      "Shell(curl -s -o jakarta-400-500-600-700.woff2 https://fonts.gstatic.com/s/plusjakartasans/v12/LDIoaomQNQcsA88c7O9yZ4KMCoOg4Ko20yw.woff2)",
+      "Shell(cd:*)",
+      "Shell(rm:*)",
+      "Shell(for p in login \"\" akun produk persona generate jadwal setting-ai; do code=$(curl -s -o /dev/null -w \"%{http_code}\" -L \"http://127.0.0.1:5000/$p\"); echo \"$p -> $code\"; done; curl -s http://127.0.0.1:5000/login | grep -c \"heroicon\\|Material Symbols\\|tailwindcss\\|googleapis\\|lh3.googleusercontent\" ; echo \"^ harus 0 (tidak ada CDN/eksternal lagi)\")",
+      "Shell(curl -s http://127.0.0.1:5000/login -o /dev/null -w server: %{http_code}\\n)"
+    ],
+    "deny": [],
+    "defaultMode": "default"
+  }
+}

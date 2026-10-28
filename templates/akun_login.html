@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}Login {{acc.platform}} - Omnipost{% endblock %}
+{% block htitle %}Login {{acc.platform}}{% endblock %}
+{% block hsub %}Akun {{acc.label}}{% endblock %}
+{% from "base.html" import icon %}
+{% block body %}
+<div class="card">
+<h2>{{ icon('key') }} Langkah Login Manual</h2>
+<p class="sub">Server sudah membukakan jendela Chromium ke halaman login {{acc.platform}}.</p>
+<div class="cap">1. Lihat layar server (VNC / headed display) — jendela Chromium terbuka di:
+   {{login_url}}
+2. Login manual sampai beres: username + password, captcha, kode 2FA, verif HP — bebas.
+3. Pastikan sudah masuk ke beranda {{acc.platform}} (bukan halaman login lagi).
+4. Balik ke halaman ini, klik tombol di bawah.</div>
+<div class="frow" style="margin-top:16px">
+<form class="f" method="post" action="/akun/{{acc.id}}/simpan-sesi">
+<button class="btn btn-pri" style="width:auto">Saya Sudah Login — Simpan Sesi</button>
+</form>
+<form class="f" method="post" action="/akun/{{acc.id}}/batal-login">
+<button class="btn btn-ghost" style="width:auto">Batalkan</button>
+</form>
+</div>
+<p class="sub">Sesi nunggu maksimal 30 menit. Setelah disimpan, cookies + session diambil dari browser itu dan browser ditutup otomatis.</p>
+</div>
+{% endblock %}

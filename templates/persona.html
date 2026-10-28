@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Persona - Omnipost{% endblock %}
+{% block htitle %}Persona per Akun{% endblock %}
+{% block hsub %}Gaya cerita tiap akun bisa beda-beda{% endblock %}
+{% from "base.html" import icon %}
+{% block body %}
+<div class="grid2">
+<div class="card">
+<h2>{{ icon('plus') }} Tambah Persona</h2>
+<p class="sub">1 akun = 1 persona. Tulis gaya bahasa + contoh cerita buat few-shot.</p>
+<form class="f" method="post">
+<label class="lb">Akun</label><select class="in" name="account_id">{% for a in accs %}<option value="{{a.id}}">{{a.label}} ({{a.platform}})</option>{% endfor %}</select>
+<label class="lb">Nama persona</label><input class="in" name="nama" placeholder="mis: emak-emak santai" required/>
+<label class="lb">Gaya bahasa</label><input class="in" name="gaya_bahasa" placeholder="mis: santai, ceplas-ceplos, receh"/>
+<label class="lb">System prompt</label><textarea class="in" name="system_prompt" rows="4" placeholder="kamu adalah ... yang cerita natural..." required></textarea>
+<label class="lb">Contoh cerita (few-shot)</label><textarea class="in" name="contoh_cerita" rows="4"></textarea>
+<button class="btn btn-pri" style="width:auto">Simpan persona</button>
+</form>
+</div>
+<div class="card">
+<h2>{{ icon('identification') }} Daftar Persona</h2>
+<p class="sub">Persona yang dipakai tiap generate AI.</p>
+<table class="tbl"><tr><th>Akun</th><th>Nama</th><th>Gaya</th><th>Prompt</th></tr>
+{% for r in rows %}<tr><td>{{r.label}}</td><td>{{r.nama}}</td><td>{{r.gaya_bahasa}}</td><td><div class="clip">{{r.system_prompt}}</div></td></tr>{% endfor %}
+</table>
+</div>
+</div>
+{% endblock %}

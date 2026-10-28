@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block title %}Akun Sosmed - Omnipost{% endblock %}
+{% block htitle %}Akun Terhubung{% endblock %}
+{% block hsub %}Klik Hubungkan, login manual di browser server, simpan sesi{% endblock %}
+{% from "base.html" import icon %}
+{% block body %}
+<section class="hero">
+<div>
+<h1 style="font-size:24px">Integrasi Channel dan Akun Sosial</h1>
+<p>{{rows|length}} akun terdaftar. Login manual via browser, sesi tersimpan otomatis.</p>
+</div>
+</section>
+
+<div class="card" style="border-style:dashed">
+<h2>{{ icon('plus') }} Hubungkan Akun Baru</h2>
+<p class="sub">Dua cara. Cara 1 (disarankan): install ekstensi <strong>Get cookies.txt LOCALLY</strong> di Chrome, buka {{'{'}}platform{{'}'}} di tab yang sudah login, klik ekstensi lalu Copy/Export JSON, paste di bawah lalu Hubungkan — sistem langsung test cookies-nya. Cara 2: kosongkan cookies lalu Hubungkan, server bukain Chromium buat login manual.</p>
+<form class="f" method="post" action="/akun/hubungkan" enctype="multipart/form-data">
+<div class="frow">
+<div><label class="lb">Platform</label><select class="in" name="platform"><option value="threads">Threads</option><option value="instagram">Instagram</option><option value="facebook">Facebook</option><option value="x">X / Twitter</option></select></div>
+<div><label class="lb">Label</label><input class="in" name="label" placeholder="mis: threads-jualan-1" required/></div>
+<div><label class="lb">Proxy (opsional)</label><input class="in" name="proxy" placeholder="http://user:pass@host:port"/></div>
+</div>
+<label class="lb">Cookies hasil export (JSON disarankan, Netscape txt juga bisa) — kosongkan untuk login manual via browser</label>
+<textarea class="in" name="cookies" rows="3" placeholder='paste JSON dari ekstensi, mis: [{"name":"sessionid",...}]'></textarea>
+<div class="frow">
+<div><label class="lb">atau upload file export</label><input class="in" type="file" name="cookie_file" accept=".json,.txt"/></div>
+<div style="display:flex;align-items:flex-end"><button class="btn btn-pri" style="width:auto">Hubungkan + Test Cookies</button></div>
+</div>
+</form>
+</div>
+
+<div class="acct-grid">
+{% for r in rows %}
+<div class="acct {% if r.status in ['error','new','waiting-login'] %}acct-bad{% endif %}">
+<div class="acct-head">
+<div style="display:flex;gap:8px;flex-wrap:wrap">
+<span class="acct-plat">{{ icon('link') }}{{r.platform}}</span>
+{% if r.status=='ok' %}<span class="pill pill-ok">Tersambung Aktif</span>
+{% elif r.status=='paused' %}<span class="pill pill-mut">Paused</span>
+{% elif r.status=='waiting-login' %}<span class="pill pill-pri">Menunggu Login</span>
+{% elif r.status=='cookies-ok' %}<span class="pill pill-pri">Cookies tersimpan</span>
+{% elif r.status=='error' %}<span class="pill pill-err">Perlu perhatian</span>
+{% else %}<span class="pill pill-mut">{{r.status}}</span>{% endif %}
+</div>
+</div>
+<div class="acct-profile">
+<div class="acct-ava">{{r.label[0]|upper}}</div>
+<div><div class="acct-name">{{r.label}}</div><div class="acct-user">{{r.platform}} - terakhir post {{(r.last_post_at or "-")[:16]}}</div></div>
+</div>
+<div class="acct-meta">
+<div><div class="ml">Post/hari</div><div class="mv">{{r.posts_per_day}}</div></div>
+<div><div class="ml">Jam aktif</div><div class="mv">{{r.active_hour_start}}-{{r.active_hour_end}}</div></div>
+<div><div class="ml">Proxy</div><div class="mv" style="font-size:11px">{{'Ya' if r.proxy else '-'}}</div></div>
+</div>
+{% if r.proxy %}<div class="mono" style="font-size:11px;color:var(--ter)">proxy: {{r.proxy}}</div>{% endif %}
+<div class="acct-act">
+<a class="btn btn-pri btn-sm" href="/akun/{{r.id}}">{{ icon('eye') }}<span>Detail</span></a>
+{% if r.status=='waiting-login' %}
+<a class="btn btn-ghost btn-sm" href="/akun/{{r.id}}/login">{{ icon('key') }}<span>Lanjut Login</span></a>
+{% else %}
+<a class="btn btn-ghost btn-sm" href="/akun/{{r.id}}/relogin">{{ icon('key') }}<span>Login Ulang</span></a>
+{% endif %}
+<a class="btn btn-ghost btn-sm" href="/akun/{{r.id}}/toggle-pause">{% if r.status=='paused' %}{{ icon('play') }}<span>Unpause</span>{% else %}{{ icon('pause') }}<span>Pause</span>{% endif %}</a>
+</div>
+</div>
+{% else %}
+<div class="card"><p class="sub">Belum ada akun. Klik Hubungkan di atas.</p></div>
+{% endfor %}
+</div>
+{% endblock %}

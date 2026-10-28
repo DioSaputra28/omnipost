@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}Setting AI - Omnipost{% endblock %}
+{% block htitle %}Setting AI{% endblock %}
+{% block hsub %}Base URL, API key, dan model OpenAI-compatible{% endblock %}
+{% from "base.html" import icon %}
+{% block body %}
+<div class="card" style="max-width:640px">
+<h2>{{ icon('cog-6-tooth') }} Koneksi AI</h2>
+<p class="sub">API tersimpan: <strong>{{masked}}</strong>. Default OpenAI: <span class="mono">https://api.openai.com/v1</span>. Kalau API key dikosongkan, dipakai yang dari .env.</p>
+<form class="f" method="post">
+<label class="lb">Base URL</label><input class="in" name="ai_base_url" value="{{cfg.ai_base_url}}" placeholder="https://api.openai.com/v1" required/>
+<label class="lb">API Key</label><input class="in" name="ai_api_key" value="{{cfg.ai_api_key}}" placeholder="sk-..." required/>
+<label class="lb">Model</label><input class="in" name="ai_model" value="{{cfg.ai_model}}" placeholder="gpt-4o-mini" required/>
+<div class="frow">
+<button class="btn btn-pri" name="test" value="0">Simpan</button>
+<button class="btn btn-ghost" name="test" value="1">Simpan + Test koneksi</button>
+</div>
+</form>
+</div>
+{% endblock %}

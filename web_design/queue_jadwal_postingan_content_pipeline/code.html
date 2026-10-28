@@ -1,0 +1,779 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="id"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Queue Post &amp; Jadwal Postingan - Social Hub Suite</title>
+<!-- Google Fonts: Josefin Sans & Plus Jakarta Sans -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Josefin+Sans:wght@400;500;600;700&amp;family=Plus+Jakarta+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<!-- Material Symbols Outlined -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS v3 -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          "colors": {
+            "outline": "#908fa0",
+            "on-secondary-fixed-variant": "#5516be",
+            "on-primary": "#1000a9",
+            "outline-variant": "#464554",
+            "on-error": "#690005",
+            "surface-bright": "#31394d",
+            "secondary-container": "#571bc1",
+            "on-primary-container": "#0d0096",
+            "on-tertiary": "#003640",
+            "inverse-primary": "#494bd6",
+            "on-surface": "#dae2fd",
+            "inverse-on-surface": "#283044",
+            "background": "#0b1326",
+            "tertiary-container": "#009eb9",
+            "surface-container": "#171f33",
+            "secondary": "#d0bcff",
+            "primary-container": "#8083ff",
+            "surface-dim": "#0b1326",
+            "surface-tint": "#c0c1ff",
+            "on-primary-fixed-variant": "#2f2ebe",
+            "surface-container-low": "#131b2e",
+            "surface-container-highest": "#2d3449",
+            "on-primary-fixed": "#07006c",
+            "primary-fixed": "#e1e0ff",
+            "on-surface-variant": "#c7c4d7",
+            "on-secondary-fixed": "#23005c",
+            "on-error-container": "#ffdad6",
+            "on-tertiary-container": "#002f38",
+            "secondary-fixed": "#e9ddff",
+            "on-secondary": "#3c0091",
+            "primary-fixed-dim": "#c0c1ff",
+            "tertiary": "#4cd7f6",
+            "on-background": "#dae2fd",
+            "primary": "#c0c1ff",
+            "secondary-fixed-dim": "#d0bcff",
+            "tertiary-fixed-dim": "#4cd7f6",
+            "surface-container-lowest": "#060e20",
+            "error": "#ffb4ab",
+            "error-container": "#93000a",
+            "on-tertiary-fixed-variant": "#004e5c",
+            "surface": "#0b1326",
+            "surface-variant": "#2d3449",
+            "surface-container-high": "#222a3d",
+            "on-secondary-container": "#c4abff",
+            "on-tertiary-fixed": "#001f26",
+            "inverse-surface": "#dae2fd",
+            "tertiary-fixed": "#acedff"
+          },
+          "borderRadius": {
+            "DEFAULT": "0.25rem",
+            "lg": "0.5rem",
+            "xl": "0.75rem",
+            "full": "9999px"
+          },
+          "spacing": {
+            "margin-desktop": "2.5rem",
+            "space-md": "1rem",
+            "margin": "2rem",
+            "space-xl": "2.5rem",
+            "gutter-lg": "2rem",
+            "space-sm": "0.5rem",
+            "margin-mobile": "1rem",
+            "space-xs": "0.25rem",
+            "space-lg": "1.5rem",
+            "gutter-sm": "1rem",
+            "gutter": "1.5rem"
+          },
+          "fontFamily": {
+            "body-lg": ["Plus Jakarta Sans"],
+            "headline-lg": ["Josefin Sans"],
+            "headline-sm": ["Josefin Sans"],
+            "headline-lg-mobile": ["Josefin Sans"],
+            "label-lg": ["Plus Jakarta Sans"],
+            "body-sm": ["Plus Jakarta Sans"],
+            "display-hero-mobile": ["Josefin Sans"],
+            "label-md": ["Plus Jakarta Sans"],
+            "label-sm": ["Plus Jakarta Sans"],
+            "body-md": ["Plus Jakarta Sans"],
+            "headline-md": ["Josefin Sans"],
+            "title-md": ["Josefin Sans"],
+            "display-hero": ["Josefin Sans"]
+          },
+          "fontSize": {
+            "body-lg": ["16px", { lineHeight: "26px", letterSpacing: "-0.01em", fontWeight: "400" }],
+            "headline-lg": ["32px", { lineHeight: "40px", letterSpacing: "-0.01em", fontWeight: "600" }],
+            "headline-sm": ["20px", { lineHeight: "28px", letterSpacing: "0.01em", fontWeight: "600" }],
+            "headline-lg-mobile": ["24px", { lineHeight: "32px", letterSpacing: "0em", fontWeight: "600" }],
+            "label-lg": ["14px", { lineHeight: "20px", letterSpacing: "0.01em", fontWeight: "600" }],
+            "body-sm": ["12px", { lineHeight: "18px", letterSpacing: "0.01em", fontWeight: "400" }],
+            "display-hero-mobile": ["32px", { lineHeight: "40px", letterSpacing: "-0.01em", fontWeight: "700" }],
+            "label-md": ["12px", { lineHeight: "16px", letterSpacing: "0.02em", fontWeight: "600" }],
+            "label-sm": ["11px", { lineHeight: "14px", letterSpacing: "0.03em", fontWeight: "500" }],
+            "body-md": ["14px", { lineHeight: "22px", letterSpacing: "0em", fontWeight: "400" }],
+            "headline-md": ["24px", { lineHeight: "32px", letterSpacing: "0em", fontWeight: "600" }],
+            "title-md": ["16px", { lineHeight: "24px", letterSpacing: "0.02em", fontWeight: "600" }],
+            "display-hero": ["48px", { lineHeight: "56px", letterSpacing: "-0.02em", fontWeight: "700" }]
+          }
+        },
+      },
+    }
+  </script>
+<style>
+    .material-symbols-outlined {
+      font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 24;
+      display: inline-block;
+      vertical-align: middle;
+      line-height: 1;
+    }
+    /* Custom subtle scrollbar */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #0b1326;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #2d3449;
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #464554;
+    }
+  </style>
+</head>
+<body class="bg-background text-on-surface antialiased min-h-screen flex selection:bg-secondary selection:text-on-secondary">
+<!-- ========================================== -->
+<!-- SIDEBAR NAVIGATION (Shared Component)     -->
+<!-- ========================================== -->
+<aside class="fixed top-0 left-0 h-screen w-64 flex flex-col justify-between bg-surface-container-low border-r border-outline-variant/20 z-50">
+<div class="p-4 flex flex-col gap-6">
+<!-- Workspace Brand Anchor -->
+<div class="flex items-center gap-3 px-2 py-1">
+<div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-secondary-container to-primary flex items-center justify-center text-on-primary-fixed shadow-md shadow-secondary-container/30">
+<span class="material-symbols-outlined text-primary-fixed" data-icon="hub">hub</span>
+</div>
+<div class="flex flex-col">
+<span class="font-headline-md text-headline-md tracking-tight font-bold text-on-surface">Workspace Studio</span>
+<span class="font-body-sm text-body-sm text-tertiary">Enterprise Tier</span>
+</div>
+</div>
+<!-- Main CTA Button -->
+<button class="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg bg-gradient-to-r from-primary-container to-secondary-container text-on-primary font-label-lg text-label-lg font-bold shadow-lg shadow-primary-container/20 hover:opacity-95 active:scale-[0.99] transition-all">
+<span class="material-symbols-outlined text-on-primary text-xl" data-icon="add_circle">add_circle</span>
+<span>Buat Postingan Baru</span>
+</button>
+<!-- Navigation Tabs List -->
+<nav class="flex flex-col gap-1.5 mt-2">
+<!-- Tab: Dashboard -->
+<a class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-on-surface-variant font-label-lg text-label-lg hover:bg-surface-container-high hover:text-on-surface transition-colors duration-150" href="#">
+<span class="material-symbols-outlined" data-icon="dashboard">dashboard</span>
+<span>Dashboard</span>
+</a>
+<!-- Tab: Akun Sosial Media -->
+<a class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-on-surface-variant font-label-lg text-label-lg hover:bg-surface-container-high hover:text-on-surface transition-colors duration-150" href="#">
+<span class="material-symbols-outlined" data-icon="switch_account">switch_account</span>
+<span>Akun Sosial Media</span>
+</a>
+<!-- Tab: Jadwal Postingan (ACTIVE) -->
+<a class="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-surface-container-highest text-primary font-label-lg text-label-lg border-l-2 border-primary" href="#">
+<span class="material-symbols-outlined" data-icon="schedule" data-weight="fill" style="font-variation-settings: 'FILL' 1;">schedule</span>
+<span>Jadwal Postingan</span>
+</a>
+<!-- Tab: Analytics -->
+<a class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-on-surface-variant font-label-lg text-label-lg hover:bg-surface-container-high hover:text-on-surface transition-colors duration-150" href="#">
+<span class="material-symbols-outlined" data-icon="analytics">analytics</span>
+<span>Analytics</span>
+</a>
+<!-- Tab: Settings -->
+<a class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-on-surface-variant font-label-lg text-label-lg hover:bg-surface-container-high hover:text-on-surface transition-colors duration-150" href="#">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+<span>Settings</span>
+</a>
+</nav>
+</div>
+<!-- Sidebar Footer Tabs -->
+<div class="p-4 border-t border-outline-variant/20 flex flex-col gap-1">
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-on-surface-variant font-label-md text-label-md hover:bg-surface-container-high hover:text-on-surface transition-colors duration-150" href="#">
+<span class="material-symbols-outlined text-lg" data-icon="help">help</span>
+<span>Bantuan &amp; Dokumentasi</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-error font-label-md text-label-md hover:bg-error-container/20 transition-colors duration-150" href="#">
+<span class="material-symbols-outlined text-lg" data-icon="logout">logout</span>
+<span>Logout</span>
+</a>
+</div>
+</aside>
+<!-- ========================================== -->
+<!-- MAIN APP CONTAINER (Offset for Sidebar)    -->
+<!-- ========================================== -->
+<div class="ml-64 flex-1 flex flex-col min-w-0 bg-background">
+<!-- ========================================== -->
+<!-- TOP NAVIGATION BAR (Shared Component)     -->
+<!-- ========================================== -->
+<header class="sticky top-0 z-40 bg-surface-container-lowest/80 backdrop-blur-md border-b border-outline-variant/20 shadow-sm flex items-center justify-between h-16 px-6">
+<!-- Left: Title & Quick Search -->
+<div class="flex items-center gap-6">
+<div>
+<h1 class="font-title-md text-title-md font-bold text-on-surface">Social Hub Suite</h1>
+<p class="font-body-sm text-body-sm text-outline">Antrean Multi-Saluran &amp; Jadwal Otomatis</p>
+</div>
+<!-- Search Bar -->
+<div class="relative w-72">
+<span class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-outline">
+<span class="material-symbols-outlined text-lg" data-icon="search">search</span>
+</span>
+<input class="w-full pl-9 pr-4 py-1.5 bg-surface-container/60 border border-outline-variant/30 rounded-lg text-on-surface font-body-sm text-body-sm placeholder:text-outline focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all" placeholder="Cari konten, campaign, hashtag..." type="text"/>
+</div>
+</div>
+<!-- Right: Actions & User Profile -->
+<div class="flex items-center gap-4">
+<!-- Workspace Switcher Pill -->
+<div class="flex items-center gap-2 px-3 py-1.5 bg-surface-container rounded-lg border border-outline-variant/20 cursor-pointer hover:border-outline-variant/50 transition-colors">
+<div class="w-2 h-2 rounded-full bg-tertiary"></div>
+<span class="font-label-md text-label-md text-on-surface font-medium">Creative Agency HQ</span>
+<span class="material-symbols-outlined text-sm text-outline" data-icon="expand_more">expand_more</span>
+</div>
+<!-- Notification & Settings Icons -->
+<div class="flex items-center gap-1">
+<button class="relative p-2 rounded-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-colors">
+<span class="material-symbols-outlined text-xl" data-icon="notifications">notifications</span>
+<span class="absolute top-1.5 right-1.5 w-2 h-2 bg-primary rounded-full"></span>
+</button>
+<button class="p-2 rounded-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-colors">
+<span class="material-symbols-outlined text-xl" data-icon="tune">tune</span>
+</button>
+</div>
+<div class="h-6 w-px bg-outline-variant/30"></div>
+<!-- User Profile Avatar -->
+<div class="flex items-center gap-2.5 pl-1 cursor-pointer">
+<img class="w-8 h-8 rounded-full border border-primary/40 object-cover" data-alt="A sophisticated close-up portrait of a digital strategist in a dark studio setting with subtle blue and deep violet ambient backlighting. The subject exudes sharp focus and calm mastery, wearing tailored modern dark apparel. High-key crisp contrast with deep slate foundations." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAvqxgFmpkshIm9ozy1v6fNcApXpqO23hPcjIviObEToN6VEY_4WT_0I3wm_uHSWQA6mXMD2aZcp6nx8IP1J7bVBHduD6VkXWE0074inASstU3JtLimocU1VsiR6yZnxHf8Bg-HDsV4P8z1KYllFX6OhAgAJO7_xuzVaMDB_6Fr6C8BiuBY-2J3wJIXXv64w8nSlTWDZEGxMzfxS6atNLr9D2nGoUMSC_m6t75zvEEG8uz8fufpyH70Fw"/>
+<div class="hidden xl:flex flex-col text-left">
+<span class="font-label-sm text-label-sm font-semibold text-on-surface">Alex Pratama</span>
+<span class="font-label-sm text-[10px] text-outline">Lead Publisher</span>
+</div>
+</div>
+</div>
+</header>
+<!-- ========================================== -->
+<!-- PAGE CONTROLS & QUEUE STATUS BAR           -->
+<!-- ========================================== -->
+<div class="px-8 pt-6 pb-4 border-b border-outline-variant/15 flex flex-col gap-5">
+<!-- Row 1: Heading, View Mode Switcher, Date/Platform Filters, and Create Action -->
+<div class="flex flex-wrap items-center justify-between gap-4">
+<div class="flex items-center gap-4">
+<div>
+<h2 class="font-headline-lg text-headline-lg font-bold text-on-surface tracking-tight">Antrean Konten</h2>
+<p class="font-body-md text-body-md text-on-surface-variant">Kelola slot publikasi visual, review copywriter, dan kalender serentak.</p>
+</div>
+</div>
+<!-- Action & Filter Group -->
+<div class="flex flex-wrap items-center gap-3">
+<!-- View Toggle: List / Timeline vs Kalender -->
+<div class="flex items-center p-1 bg-surface-container-low rounded-lg border border-outline-variant/30">
+<button class="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-surface-container-highest text-primary font-label-md text-label-md shadow-sm transition-all">
+<span class="material-symbols-outlined text-base" data-icon="view_agenda">view_agenda</span>
+<span>Tampilan List &amp; Antrean</span>
+</button>
+<button class="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-on-surface-variant hover:text-on-surface font-label-md text-label-md transition-all">
+<span class="material-symbols-outlined text-base" data-icon="calendar_month">calendar_month</span>
+<span>Kalender Bulanan</span>
+</button>
+</div>
+<!-- Date Range Filter -->
+<div class="flex items-center gap-2 px-3 py-1.5 bg-surface-container-low border border-outline-variant/30 rounded-lg text-on-surface font-label-md text-label-md cursor-pointer hover:border-outline-variant/60">
+<span class="material-symbols-outlined text-base text-primary" data-icon="date_range">date_range</span>
+<span>24 Okt - 31 Okt 2024</span>
+<span class="material-symbols-outlined text-sm text-outline" data-icon="keyboard_arrow_down">keyboard_arrow_down</span>
+</div>
+<!-- Platform Selector Filter -->
+<div class="flex items-center gap-2 px-3 py-1.5 bg-surface-container-low border border-outline-variant/30 rounded-lg text-on-surface font-label-md text-label-md cursor-pointer hover:border-outline-variant/60">
+<span class="material-symbols-outlined text-base text-tertiary" data-icon="filter_list">filter_list</span>
+<span>Semua Akun (4 Terhubung)</span>
+<span class="material-symbols-outlined text-sm text-outline" data-icon="keyboard_arrow_down">keyboard_arrow_down</span>
+</div>
+<!-- + Jadwalkan Postingan Action -->
+<button class="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-primary-container to-secondary-container text-on-primary font-label-lg text-label-lg font-bold rounded-lg shadow-md shadow-primary-container/20 hover:brightness-110 active:scale-[0.98] transition-all">
+<span class="material-symbols-outlined text-lg" data-icon="event_upcoming">event_upcoming</span>
+<span>+ Jadwalkan Postingan</span>
+</button>
+</div>
+</div>
+<!-- Row 2: Queue Status Badges / Tab Status Antrean -->
+<div class="flex items-center gap-2 pt-1 border-t border-outline-variant/10">
+<!-- Status: Terjadwal (Active tab style) -->
+<button class="flex items-center gap-2.5 px-4 py-2 rounded-lg bg-surface-container border border-primary/40 text-on-surface font-label-md text-label-md transition-colors">
+<span class="w-2.5 h-2.5 rounded-full bg-primary animate-pulse"></span>
+<span class="font-semibold text-primary">Terjadwal</span>
+<span class="px-2 py-0.5 rounded-full bg-primary/20 text-primary font-bold text-xs">14</span>
+</button>
+<!-- Status: Menunggu Persetujuan / Review -->
+<button class="flex items-center gap-2.5 px-4 py-2 rounded-lg bg-surface-container-low border border-outline-variant/20 text-on-surface-variant hover:text-on-surface hover:border-outline-variant/40 font-label-md text-label-md transition-colors">
+<span class="w-2.5 h-2.5 rounded-full bg-tertiary"></span>
+<span>Menunggu Persetujuan / Review</span>
+<span class="px-2 py-0.5 rounded-full bg-tertiary-container/30 text-tertiary font-bold text-xs">3</span>
+</button>
+<!-- Status: Draft -->
+<button class="flex items-center gap-2.5 px-4 py-2 rounded-lg bg-surface-container-low border border-outline-variant/20 text-on-surface-variant hover:text-on-surface hover:border-outline-variant/40 font-label-md text-label-md transition-colors">
+<span class="w-2.5 h-2.5 rounded-full bg-outline"></span>
+<span>Draft Konten</span>
+<span class="px-2 py-0.5 rounded-full bg-surface-variant text-on-surface-variant font-bold text-xs">6</span>
+</button>
+<!-- Status: Terbit -->
+<button class="flex items-center gap-2.5 px-4 py-2 rounded-lg bg-surface-container-low border border-outline-variant/20 text-on-surface-variant hover:text-on-surface hover:border-outline-variant/40 font-label-md text-label-md transition-colors">
+<span class="w-2.5 h-2.5 rounded-full bg-secondary-fixed-dim"></span>
+<span>Terbit (Bulan Ini)</span>
+<span class="px-2 py-0.5 rounded-full bg-surface-variant text-on-surface-variant font-bold text-xs">120</span>
+</button>
+<!-- Bulk Action Option right aligned -->
+<div class="ml-auto flex items-center gap-3">
+<span class="font-label-sm text-label-sm text-outline">Pilih Semua untuk Tindakan Massal</span>
+<input class="w-4 h-4 rounded border-outline-variant bg-surface-container text-primary focus:ring-primary focus:ring-offset-background cursor-pointer" type="checkbox"/>
+</div>
+</div>
+</div>
+<!-- ========================================== -->
+<!-- MAIN WORKSPACE: QUEUE LIST & INSIGHTS RAIL -->
+<!-- ========================================== -->
+<main class="flex-1 p-8 grid grid-cols-12 gap-8 items-start">
+<!-- ==================================================== -->
+<!-- LEFT 8-COLS: QUEUE PIPELINE / TIMELINE CARDS          -->
+<!-- ==================================================== -->
+<section class="col-span-12 xl:col-span-8 flex flex-col gap-8">
+<!-- =================================== -->
+<!-- GROUP 1: HARI INI - 24 OKTOBER 2024 -->
+<!-- =================================== -->
+<div class="flex flex-col gap-4">
+<!-- Group Date Header Badge -->
+<div class="flex items-center justify-between pb-2 border-b border-outline-variant/20">
+<div class="flex items-center gap-3">
+<div class="p-1.5 rounded-lg bg-primary-container/20 text-primary">
+<span class="material-symbols-outlined text-lg" data-icon="today">today</span>
+</div>
+<h3 class="font-title-md text-title-md font-bold text-on-surface">Hari Ini — 24 Oktober 2024</h3>
+<span class="px-2.5 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20 font-label-sm text-label-sm">2 Postingan Aktif</span>
+</div>
+<span class="font-body-sm text-body-sm text-tertiary flex items-center gap-1">
+<span class="material-symbols-outlined text-sm" data-icon="bolt">bolt</span> Slot Terbaik Berjalan
+            </span>
+</div>
+<!-- Queue Item Card 1: Instagram Carousel -->
+<div class="group p-5 rounded-xl bg-surface-container/70 border border-outline-variant/20 hover:border-primary/50 hover:bg-surface-container transition-all duration-200 shadow-sm flex flex-col md:flex-row gap-5">
+<!-- Thumbnail Media Preview with Platform Overlay -->
+<div class="relative w-full md:w-44 h-36 rounded-lg overflow-hidden shrink-0 bg-surface-container-high border border-outline-variant/20">
+<img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" data-alt="A modern, high-tech isometric 3D graphic showing social media analytics charts, purple glowing neon lines, and sleek smartphone mockup displays on a dark deep slate backdrop with ambient indigo highlights. Professional corporate creative aesthetic." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCsHU0nvQHf4nl9cKtKiETjlDDVVAE2XMvz36GXoiUAy6630eBa0FiLsIYinVmXejHPz7KmfTK77gKxDucMuBK66TEKwUP83X2PkDFFW0b2UN2kySR32EhVKt2rApxmLhg5WZtsWjNb9BnAzGSlV-1DPIDs1am2qzOrcTnPvtA4T1i5ZfZxhvqG1nPjkMOedoxz4YGSaIPfq_zwz8DNPBlT3f-xysB2VQgOUH6RsBgDMvye4VtE4B1kzA"/>
+<div class="absolute top-2 left-2 px-2 py-0.5 rounded bg-surface-container-lowest/80 backdrop-blur-md text-[10px] font-semibold text-tertiary flex items-center gap-1 border border-outline-variant/30">
+<span class="material-symbols-outlined text-xs" data-icon="collections">collections</span> 5 Slides
+              </div>
+<div class="absolute bottom-2 right-2 px-2 py-0.5 rounded bg-surface-container-lowest/80 backdrop-blur-md text-[11px] font-semibold text-on-surface flex items-center gap-1 border border-outline-variant/30">
+<span class="w-1.5 h-1.5 rounded-full bg-pink-500"></span> IG Carousel
+              </div>
+</div>
+<!-- Content Details & Meta -->
+<div class="flex-1 flex flex-col justify-between gap-3">
+<div>
+<!-- Time & AI Peak Indicator -->
+<div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+<div class="flex items-center gap-2">
+<span class="font-headline-sm text-headline-sm text-on-surface font-bold tracking-tight">10:30 WIB</span>
+<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-tertiary-container/20 text-tertiary border border-tertiary/30 font-label-sm text-label-sm font-semibold">
+<span class="material-symbols-outlined text-xs" data-icon="auto_awesome">auto_awesome</span> AI Peak Time (Akurasi 94%)
+                    </span>
+</div>
+<!-- Status Badge -->
+<span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-surface-container-high border border-outline-variant/30 text-on-surface font-label-sm text-label-sm">
+<span class="w-2 h-2 rounded-full bg-secondary-fixed-dim"></span> Siap Tayang Otomatis
+                  </span>
+</div>
+<!-- Text Caption Preview -->
+<p class="font-body-md text-body-md text-on-surface line-clamp-2 leading-relaxed">
+                  "5 Kebiasaan tim marketing top tier dalam mengelola antrean konten multi-channel tanpa burnout. Swipe sampai habis untuk checklist panduan implementasinya! #MarketingStrategy #SocialMediaTips #GrowthHacks"
+                </p>
+<div class="mt-2 flex items-center gap-2 text-outline font-body-sm text-body-sm">
+<span>Target Akun: <strong class="text-on-surface">@studiocreative.id</strong></span>
+<span>•</span>
+<span>Disetujui oleh: Sarah K.</span>
+</div>
+</div>
+<!-- Quick Action Toolbar -->
+<div class="pt-3 border-t border-outline-variant/15 flex items-center justify-between">
+<div class="flex items-center gap-2">
+<button class="px-3 py-1 rounded-lg bg-surface-container-high hover:bg-surface-variant text-on-surface font-label-md text-label-md flex items-center gap-1.5 transition-colors">
+<span class="material-symbols-outlined text-sm" data-icon="edit_calendar">edit_calendar</span> Edit Jadwal
+                  </button>
+<button class="px-3 py-1 rounded-lg bg-surface-container-high hover:bg-surface-variant text-on-surface font-label-md text-label-md flex items-center gap-1.5 transition-colors">
+<span class="material-symbols-outlined text-sm" data-icon="visibility">visibility</span> Pratinjau Post
+                  </button>
+</div>
+<div class="flex items-center gap-2">
+<button class="px-3 py-1 rounded-lg bg-primary/10 hover:bg-primary/20 text-primary font-label-md text-label-md flex items-center gap-1 transition-colors">
+<span class="material-symbols-outlined text-sm" data-icon="send">send</span> Publish Sekarang
+                  </button>
+<button class="p-1.5 rounded-lg text-outline hover:text-error hover:bg-error-container/20 transition-colors" title="Hapus">
+<span class="material-symbols-outlined text-base" data-icon="delete">delete</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+<!-- Queue Item Card 2: LinkedIn Article / Case Study -->
+<div class="group p-5 rounded-xl bg-surface-container/70 border border-outline-variant/20 hover:border-primary/50 hover:bg-surface-container transition-all duration-200 shadow-sm flex flex-col md:flex-row gap-5">
+<!-- Thumbnail Media Preview -->
+<div class="relative w-full md:w-44 h-36 rounded-lg overflow-hidden shrink-0 bg-surface-container-high border border-outline-variant/20">
+<img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" data-alt="A clean executive workspace shot with high-end glass monitors showing enterprise growth metrics and modern clean typography. Soft blue corporate studio lighting with polished dark slate environment." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDYpYvWJSA2XA9XQimS_xkx1U-WXwFCTeRxBnI0WFIJMpK6e9BjR07_RzRw7sRUIEciBA_aWxug77VR08cppYBQhLQfB7vbXUB0-SjYpSyomEWCGOXQ6oqMaxCuB7KEMRsr_wG8HVw4W9Tc6pL_1VWA9UrmeDs_SCgQymjQNmcDVVpcKmGwaoS8CnFNS3OW5YsycUb2eoSg6tY3DuSgTSoo3PrSV6gvZuS3UGlQFR0nDoe9_hejpxXuQg"/>
+<div class="absolute bottom-2 right-2 px-2 py-0.5 rounded bg-surface-container-lowest/80 backdrop-blur-md text-[11px] font-semibold text-on-surface flex items-center gap-1 border border-outline-variant/30">
+<span class="w-1.5 h-1.5 rounded-full bg-blue-500"></span> LinkedIn Article
+              </div>
+</div>
+<!-- Content Details -->
+<div class="flex-1 flex flex-col justify-between gap-3">
+<div>
+<div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+<div class="flex items-center gap-2">
+<span class="font-headline-sm text-headline-sm text-on-surface font-bold tracking-tight">19:15 WIB</span>
+<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-surface-variant text-on-surface-variant font-label-sm text-label-sm">
+<span class="material-symbols-outlined text-xs" data-icon="schedule">schedule</span> Regular Prime
+                    </span>
+</div>
+<!-- Status: Menunggu Approval Klien -->
+<span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-tertiary-container/20 border border-tertiary/30 text-tertiary font-label-sm text-label-sm font-semibold">
+<span class="w-2 h-2 rounded-full bg-tertiary animate-ping"></span> Menunggu Approval Klien
+                  </span>
+</div>
+<p class="font-body-md text-body-md text-on-surface line-clamp-2 leading-relaxed">
+                  "Bagaimana AI Copilot mempercepat workflow social reporting hingga 3x lipat pada brand consumer tech. Studi kasus komprehensif Q3 2024 kami buka secara transparan di artikel ini."
+                </p>
+<div class="mt-2 flex items-center gap-2 text-outline font-body-sm text-body-sm">
+<span>Target Akun: <strong class="text-on-surface">Studio Corporate Enterprise</strong></span>
+<span>•</span>
+<span class="text-tertiary">Menunggu konfirmasi Brand Manager</span>
+</div>
+</div>
+<!-- Quick Action Toolbar -->
+<div class="pt-3 border-t border-outline-variant/15 flex items-center justify-between">
+<div class="flex items-center gap-2">
+<button class="px-3 py-1 rounded-lg bg-surface-container-high hover:bg-surface-variant text-on-surface font-label-md text-label-md flex items-center gap-1.5 transition-colors">
+<span class="material-symbols-outlined text-sm" data-icon="edit_calendar">edit_calendar</span> Edit Jadwal
+                  </button>
+<button class="px-3 py-1 rounded-lg bg-surface-container-high hover:bg-surface-variant text-on-surface font-label-md text-label-md flex items-center gap-1.5 transition-colors">
+<span class="material-symbols-outlined text-sm" data-icon="visibility">visibility</span> Pratinjau Post
+                  </button>
+<button class="px-3 py-1 rounded-lg bg-tertiary/10 hover:bg-tertiary/20 text-tertiary font-label-md text-label-md flex items-center gap-1 transition-colors">
+<span class="material-symbols-outlined text-sm" data-icon="notification_important">notification_important</span> Ping Klien
+                  </button>
+</div>
+<div class="flex items-center gap-2">
+<button class="p-1.5 rounded-lg text-outline hover:text-error hover:bg-error-container/20 transition-colors" title="Hapus">
+<span class="material-symbols-outlined text-base" data-icon="delete">delete</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- =================================== -->
+<!-- GROUP 2: BESOK - 25 OKTOBER 2024   -->
+<!-- =================================== -->
+<div class="flex flex-col gap-4 pt-4">
+<div class="flex items-center justify-between pb-2 border-b border-outline-variant/20">
+<div class="flex items-center gap-3">
+<div class="p-1.5 rounded-lg bg-surface-container-highest text-secondary">
+<span class="material-symbols-outlined text-lg" data-icon="calendar_today">calendar_today</span>
+</div>
+<h3 class="font-title-md text-title-md font-bold text-on-surface">Besok — 25 Oktober 2024</h3>
+<span class="px-2.5 py-0.5 rounded-full bg-surface-variant text-on-surface-variant font-label-sm text-label-sm">2 Postingan Antrean</span>
+</div>
+<span class="font-body-sm text-body-sm text-outline">Estimasi Jangkauan: +48.5K Viewers</span>
+</div>
+<!-- Queue Item Card 3: TikTok Video Reel -->
+<div class="group p-5 rounded-xl bg-surface-container/70 border border-outline-variant/20 hover:border-primary/50 hover:bg-surface-container transition-all duration-200 shadow-sm flex flex-col md:flex-row gap-5">
+<!-- Video Thumbnail -->
+<div class="relative w-full md:w-44 h-36 rounded-lg overflow-hidden shrink-0 bg-surface-container-high border border-outline-variant/20">
+<img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" data-alt="A dynamic vertical video frame composition capturing a creative Indonesian creator in a dark futuristic studio editing video content with glowing violet neon ambiance and high energetic mood." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBwXuWA-BBlEJzNvgLh3fDDxkFsf12w8Y3pbBdPIG_GG2GSkkln8LGT6jHHUt493h4FIAEv35EPwWZAX9_n7nlXGCkU3UTCSPCAuuE-I2Es1KZGrB-0olRpgrCuRINAsFSedXTXG6Pij_DF2LInuOARenDg2KdfrOwiEQwhFrAsaVcGa8LHIYwsW5k3dJMzhH3x8uSjqepWxE8QRvLGU6sc5GmYLHpa8bxF8n85-4agH1V9WPMPFI6vog"/>
+<div class="absolute inset-0 bg-black/30 flex items-center justify-center">
+<span class="material-symbols-outlined text-3xl text-white/90 drop-shadow" data-icon="play_circle">play_circle</span>
+</div>
+<div class="absolute bottom-2 right-2 px-2 py-0.5 rounded bg-surface-container-lowest/80 backdrop-blur-md text-[11px] font-semibold text-on-surface flex items-center gap-1 border border-outline-variant/30">
+<span class="w-1.5 h-1.5 rounded-full bg-cyan-400"></span> TikTok Video (0:48)
+              </div>
+</div>
+<!-- Content Details -->
+<div class="flex-1 flex flex-col justify-between gap-3">
+<div>
+<div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+<div class="flex items-center gap-2">
+<span class="font-headline-sm text-headline-sm text-on-surface font-bold tracking-tight">12:00 WIB</span>
+<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-tertiary-container/20 text-tertiary border border-tertiary/30 font-label-sm text-label-sm font-semibold">
+<span class="material-symbols-outlined text-xs" data-icon="auto_awesome">auto_awesome</span> AI Peak Lunch Time
+                    </span>
+</div>
+<!-- Status Badge -->
+<span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-surface-container-high border border-outline-variant/30 text-on-surface font-label-sm text-label-sm">
+<span class="w-2 h-2 rounded-full bg-secondary-fixed-dim"></span> Siap Tayang Otomatis
+                  </span>
+</div>
+<p class="font-body-md text-body-md text-on-surface line-clamp-2 leading-relaxed">
+                  "Behind the scene setup video campaign terbaru! Jangan skip detik ke-15 ada tips lighting murah hasil maksimal 🎬✨ #BehindTheScenes #AgencyLife #VideoProduction #TikTokCreatives"
+                </p>
+<div class="mt-2 flex items-center gap-2 text-outline font-body-sm text-body-sm">
+<span>Target Akun: <strong class="text-on-surface">@studiomedia_official (TikTok)</strong></span>
+<span>•</span>
+<span>Audio: Trending Sound #44</span>
+</div>
+</div>
+<!-- Quick Action Toolbar -->
+<div class="pt-3 border-t border-outline-variant/15 flex items-center justify-between">
+<div class="flex items-center gap-2">
+<button class="px-3 py-1 rounded-lg bg-surface-container-high hover:bg-surface-variant text-on-surface font-label-md text-label-md flex items-center gap-1.5 transition-colors">
+<span class="material-symbols-outlined text-sm" data-icon="edit_calendar">edit_calendar</span> Edit Jadwal
+                  </button>
+<button class="px-3 py-1 rounded-lg bg-surface-container-high hover:bg-surface-variant text-on-surface font-label-md text-label-md flex items-center gap-1.5 transition-colors">
+<span class="material-symbols-outlined text-sm" data-icon="visibility">visibility</span> Pratinjau Post
+                  </button>
+</div>
+<div class="flex items-center gap-2">
+<button class="px-3 py-1 rounded-lg bg-primary/10 hover:bg-primary/20 text-primary font-label-md text-label-md flex items-center gap-1 transition-colors">
+<span class="material-symbols-outlined text-sm" data-icon="send">send</span> Publish Sekarang
+                  </button>
+<button class="p-1.5 rounded-lg text-outline hover:text-error hover:bg-error-container/20 transition-colors" title="Hapus">
+<span class="material-symbols-outlined text-base" data-icon="delete">delete</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+<!-- Queue Item Card 4: X Thread (Draft Review) -->
+<div class="group p-5 rounded-xl bg-surface-container/70 border border-outline-variant/20 hover:border-primary/50 hover:bg-surface-container transition-all duration-200 shadow-sm flex flex-col md:flex-row gap-5">
+<!-- Icon placeholder for thread -->
+<div class="relative w-full md:w-44 h-36 rounded-lg overflow-hidden shrink-0 bg-surface-container-highest flex flex-col items-center justify-center p-4 border border-outline-variant/20">
+<span class="material-symbols-outlined text-4xl text-outline mb-1" data-icon="format_quote">format_quote</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant text-center">X Thread (8 Tweets)</span>
+<div class="absolute bottom-2 right-2 px-2 py-0.5 rounded bg-surface-container-lowest/80 text-[11px] font-semibold text-on-surface flex items-center gap-1">
+<span class="w-1.5 h-1.5 rounded-full bg-slate-300"></span> X (Twitter)
+              </div>
+</div>
+<!-- Content Details -->
+<div class="flex-1 flex flex-col justify-between gap-3">
+<div>
+<div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+<div class="flex items-center gap-2">
+<span class="font-headline-sm text-headline-sm text-on-surface font-bold tracking-tight">16:45 WIB</span>
+<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-surface-variant text-on-surface-variant font-label-sm text-label-sm">
+<span class="material-symbols-outlined text-xs" data-icon="pending">pending</span> Rekomendasi Jam Sore
+                    </span>
+</div>
+<!-- Status: Draft Review -->
+<span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-surface-variant text-on-surface-variant font-label-sm text-label-sm font-semibold">
+<span class="w-2 h-2 rounded-full bg-outline"></span> Draft Review
+                  </span>
+</div>
+<p class="font-body-md text-body-md text-on-surface line-clamp-2 leading-relaxed">
+                  "1/8 Mengapa algoritma media sosial 2025 lebih memprioritaskan 'Saves' dan 'Direct Shares' daripada sekadar Likes biasa? Berikut breakdown riset mendalam kami 🧵👇"
+                </p>
+<div class="mt-2 flex items-center gap-2 text-outline font-body-sm text-body-sm">
+<span>Target Akun: <strong class="text-on-surface">@studiohq_tech</strong></span>
+<span>•</span>
+<span>Penulis: Kevin M. (Perlu review akhir)</span>
+</div>
+</div>
+<!-- Quick Action Toolbar -->
+<div class="pt-3 border-t border-outline-variant/15 flex items-center justify-between">
+<div class="flex items-center gap-2">
+<button class="px-3 py-1 rounded-lg bg-surface-container-high hover:bg-surface-variant text-on-surface font-label-md text-label-md flex items-center gap-1.5 transition-colors">
+<span class="material-symbols-outlined text-sm" data-icon="edit">edit</span> Lanjutkan Draft
+                  </button>
+<button class="px-3 py-1 rounded-lg bg-surface-container-high hover:bg-surface-variant text-on-surface font-label-md text-label-md flex items-center gap-1.5 transition-colors">
+<span class="material-symbols-outlined text-sm" data-icon="visibility">visibility</span> Pratinjau Thread
+                  </button>
+</div>
+<div class="flex items-center gap-2">
+<button class="p-1.5 rounded-lg text-outline hover:text-error hover:bg-error-container/20 transition-colors" title="Hapus">
+<span class="material-symbols-outlined text-base" data-icon="delete">delete</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- =================================== -->
+<!-- GROUP 3: MINGGU DEPAN (COLLAPSIBLE) -->
+<!-- =================================== -->
+<div class="flex flex-col gap-4 pt-4">
+<div class="flex items-center justify-between pb-2 border-b border-outline-variant/20">
+<div class="flex items-center gap-3">
+<div class="p-1.5 rounded-lg bg-surface-container-high text-on-surface-variant">
+<span class="material-symbols-outlined text-lg" data-icon="next_week">next_week</span>
+</div>
+<h3 class="font-title-md text-title-md font-bold text-on-surface">Minggu Depan — 28 Okt - 03 Nov 2024</h3>
+<span class="px-2.5 py-0.5 rounded-full bg-surface-variant text-on-surface-variant font-label-sm text-label-sm">10 Postingan Terjadwal</span>
+</div>
+<button class="flex items-center gap-1 text-primary font-label-md text-label-md hover:underline">
+<span>Buka Seluruh Slot (10)</span>
+<span class="material-symbols-outlined text-sm" data-icon="expand_more">expand_more</span>
+</button>
+</div>
+</div>
+</section>
+<!-- ==================================================== -->
+<!-- RIGHT 4-COLS: AI BEST TIME & QUOTA WIDGET RAIL       -->
+<!-- ==================================================== -->
+<aside class="col-span-12 xl:col-span-4 flex flex-col gap-6">
+<!-- WIDGET 1: Waktu Terbaik Posting (AI Best Time) -->
+<div class="p-6 rounded-2xl bg-surface-container-low border border-outline-variant/20 shadow-lg relative overflow-hidden">
+<!-- Subtle glow accent top right -->
+<div class="absolute -top-12 -right-12 w-36 h-36 bg-primary/10 rounded-full blur-3xl pointer-events-none"></div>
+<div class="flex items-center justify-between mb-4">
+<div class="flex items-center gap-2.5">
+<div class="p-2 rounded-xl bg-primary-container/20 text-primary">
+<span class="material-symbols-outlined" data-icon="psychology">psychology</span>
+</div>
+<div>
+<h4 class="font-title-md text-title-md font-bold text-on-surface">AI Best Time Engine</h4>
+<p class="font-body-sm text-body-sm text-outline">Prediksi interaksi audiens tertinggi</p>
+</div>
+</div>
+<span class="px-2 py-0.5 rounded bg-tertiary-container/30 text-tertiary font-label-sm text-label-sm font-bold">Live</span>
+</div>
+<!-- Recommendations List -->
+<div class="flex flex-col gap-3 mt-4">
+<!-- Slot 1 -->
+<div class="p-3.5 rounded-xl bg-surface-container border border-outline-variant/20 flex items-center justify-between hover:border-primary/40 transition-colors">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded-lg bg-pink-500/20 text-pink-400 flex items-center justify-center font-bold text-xs">
+                  IG
+                </div>
+<div>
+<div class="flex items-center gap-2">
+<span class="font-label-lg text-label-lg font-bold text-on-surface">11:30 - 13:00 WIB</span>
+<span class="px-1.5 py-0.2 rounded bg-tertiary/20 text-tertiary text-[10px] font-bold">+38% Eng</span>
+</div>
+<span class="font-body-sm text-body-sm text-outline">Carousel &amp; Video Reels</span>
+</div>
+</div>
+<button class="p-1.5 rounded-lg bg-surface-container-high hover:bg-primary-container hover:text-on-primary text-on-surface-variant transition-colors" title="Pakai Slot Ini">
+<span class="material-symbols-outlined text-base" data-icon="add">add</span>
+</button>
+</div>
+<!-- Slot 2 -->
+<div class="p-3.5 rounded-xl bg-surface-container border border-outline-variant/20 flex items-center justify-between hover:border-primary/40 transition-colors">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded-lg bg-cyan-500/20 text-cyan-400 flex items-center justify-center font-bold text-xs">
+                  TT
+                </div>
+<div>
+<div class="flex items-center gap-2">
+<span class="font-label-lg text-label-lg font-bold text-on-surface">19:00 - 21:30 WIB</span>
+<span class="px-1.5 py-0.2 rounded bg-tertiary/20 text-tertiary text-[10px] font-bold">+52% FYP</span>
+</div>
+<span class="font-body-sm text-body-sm text-outline">Short-form Storytelling</span>
+</div>
+</div>
+<button class="p-1.5 rounded-lg bg-surface-container-high hover:bg-primary-container hover:text-on-primary text-on-surface-variant transition-colors" title="Pakai Slot Ini">
+<span class="material-symbols-outlined text-base" data-icon="add">add</span>
+</button>
+</div>
+<!-- Slot 3 -->
+<div class="p-3.5 rounded-xl bg-surface-container border border-outline-variant/20 flex items-center justify-between hover:border-primary/40 transition-colors">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded-lg bg-blue-500/20 text-blue-400 flex items-center justify-center font-bold text-xs">
+                  IN
+                </div>
+<div>
+<div class="flex items-center gap-2">
+<span class="font-label-lg text-label-lg font-bold text-on-surface">08:00 - 09:30 WIB</span>
+<span class="px-1.5 py-0.2 rounded bg-secondary/20 text-secondary text-[10px] font-bold">+29% B2B</span>
+</div>
+<span class="font-body-sm text-body-sm text-outline">Thoughts Leadership / Case Study</span>
+</div>
+</div>
+<button class="p-1.5 rounded-lg bg-surface-container-high hover:bg-primary-container hover:text-on-primary text-on-surface-variant transition-colors" title="Pakai Slot Ini">
+<span class="material-symbols-outlined text-base" data-icon="add">add</span>
+</button>
+</div>
+</div>
+<div class="mt-4 pt-3 border-t border-outline-variant/15 flex items-center justify-between text-body-sm font-body-sm text-outline">
+<span>Dihitung dari 14.8K data interaksi audiens Anda.</span>
+</div>
+</div>
+<!-- WIDGET 2: Ringkasan Kuota Posting Harian per Akun -->
+<div class="p-6 rounded-2xl bg-surface-container-low border border-outline-variant/20 shadow-lg">
+<div class="flex items-center justify-between mb-4">
+<h4 class="font-title-md text-title-md font-bold text-on-surface">Kuota Posting Harian</h4>
+<span class="font-label-sm text-label-sm text-outline">Reset: 00:00 WIB</span>
+</div>
+<div class="flex flex-col gap-4">
+<!-- Channel Instagram -->
+<div class="flex flex-col gap-1.5">
+<div class="flex justify-between items-center font-label-md text-label-md">
+<span class="text-on-surface flex items-center gap-1.5">
+<span class="w-2 h-2 rounded-full bg-pink-500"></span> Instagram (@studiocreative)
+                </span>
+<span class="font-bold text-on-surface">2 / 4 Post</span>
+</div>
+<div class="w-full h-2 bg-surface-container-highest rounded-full overflow-hidden">
+<div class="h-full bg-gradient-to-r from-secondary to-primary rounded-full" style="width: 50%;"></div>
+</div>
+</div>
+<!-- Channel TikTok -->
+<div class="flex flex-col gap-1.5">
+<div class="flex justify-between items-center font-label-md text-label-md">
+<span class="text-on-surface flex items-center gap-1.5">
+<span class="w-2 h-2 rounded-full bg-cyan-400"></span> TikTok Media Channel
+                </span>
+<span class="font-bold text-on-surface">1 / 3 Video</span>
+</div>
+<div class="w-full h-2 bg-surface-container-highest rounded-full overflow-hidden">
+<div class="h-full bg-tertiary rounded-full" style="width: 33%;"></div>
+</div>
+</div>
+<!-- Channel LinkedIn -->
+<div class="flex flex-col gap-1.5">
+<div class="flex justify-between items-center font-label-md text-label-md">
+<span class="text-on-surface flex items-center gap-1.5">
+<span class="w-2 h-2 rounded-full bg-blue-500"></span> LinkedIn Company Page
+                </span>
+<span class="font-bold text-on-surface">1 / 2 Update</span>
+</div>
+<div class="w-full h-2 bg-surface-container-highest rounded-full overflow-hidden">
+<div class="h-full bg-primary-container rounded-full" style="width: 50%;"></div>
+</div>
+</div>
+<!-- Channel X (Twitter) -->
+<div class="flex flex-col gap-1.5">
+<div class="flex justify-between items-center font-label-md text-label-md">
+<span class="text-on-surface flex items-center gap-1.5">
+<span class="w-2 h-2 rounded-full bg-slate-300"></span> X (Twitter) Thread Slot
+                </span>
+<span class="font-bold text-on-surface">0 / 5 Tweet</span>
+</div>
+<div class="w-full h-2 bg-surface-container-highest rounded-full overflow-hidden">
+<div class="h-full bg-outline rounded-full" style="width: 5%;"></div>
+</div>
+</div>
+</div>
+<!-- Bottom upgrade banner / note -->
+<div class="mt-5 p-3 rounded-xl bg-surface-container-high/60 border border-outline-variant/20 flex items-center gap-3">
+<span class="material-symbols-outlined text-secondary" data-icon="cloud_done">cloud_done</span>
+<div class="flex-1">
+<p class="font-label-sm text-label-sm text-on-surface">Penyimpanan Aset Cloud: 82% terpakai</p>
+<p class="font-body-sm text-xs text-outline">Kapasitas 500GB SSD Terenkripsi</p>
+</div>
+</div>
+</div>
+<!-- WIDGET 3: Fast Pipeline Health Status -->
+<div class="p-5 rounded-2xl bg-surface-container-low border border-outline-variant/20 flex items-center justify-between">
+<div class="flex items-center gap-3">
+<div class="w-3 h-3 rounded-full bg-emerald-400 animate-pulse"></div>
+<div>
+<p class="font-label-md text-label-md font-bold text-on-surface">Status Server Cron: Normal</p>
+<p class="font-body-sm text-body-sm text-outline">Webhook sinkronisasi terhubung tanpa kendala</p>
+</div>
+</div>
+<span class="material-symbols-outlined text-outline" data-icon="sync">sync</span>
+</div>
+</aside>
+</main>
+</div>
+</body></html>

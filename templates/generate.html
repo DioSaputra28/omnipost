@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}Generate AI - Omnipost{% endblock %}
+{% block htitle %}Generate Storytelling{% endblock %}
+{% block hsub %}Preview cerita AI sebelum dijadwalkan atau dipost{% endblock %}
+{% from "base.html" import icon %}
+{% block body %}
+<div class="grid2">
+<div class="card">
+<h2>{{ icon('sparkles') }} Buat Draft dan Publikasi Cepat</h2>
+<p class="sub">Pilih akun (persona ikut akun) dan produk, AI bikin cerita soft-selling.</p>
+<form class="f" method="post">
+<label class="lb">Akun target</label><select class="in" name="account_id">{% for a in accs %}<option value="{{a.id}}">{{a.label}} ({{a.platform}})</option>{% endfor %}</select>
+<label class="lb">Produk</label><select class="in" name="product_id">{% for p in prods %}<option value="{{p.id}}">{{p.nama}}</option>{% endfor %}</select>
+<button class="btn btn-pri">Generate Cerita</button>
+</form>
+</div>
+<div class="card">
+<h2>{{ icon('document-text') }} Hasil Generate</h2>
+<p class="sub">Kalau cocok, posting manual dari dashboard atau biarkan scheduler yang jalan.</p>
+{% if out %}<div class="cap">{{out}}</div>
+<form class="f" method="post" action="/post-now" style="margin-top:12px">
+<input type="hidden" name="account_id" value="{{picked_aid}}"/>
+<input type="hidden" name="product_id" value="{{picked_pid}}"/>
+<button class="btn btn-pri" style="width:auto">Posting Cerita Ini Sekarang</button>
+</form>
+{% else %}<p class="sub">Belum ada hasil. Generate dulu.</p>{% endif %}
+</div>
+</div>
+{% endblock %}

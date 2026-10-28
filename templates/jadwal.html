@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block title %}Jadwal Postingan - Omnipost{% endblock %}
+{% block htitle %}Antrean Konten{% endblock %}
+{% block hsub %}Kelola slot publikasi dan jadwal otomatis{% endblock %}
+{% from "base.html" import icon %}
+{% block body %}
+<section class="hero">
+<div>
+<h1 style="font-size:24px">Antrean Konten</h1>
+<p>{{queued|length}} terjadwal, {{drafts|length}} draft, {{posted_month}} terbit bulan ini.</p>
+</div>
+<div class="hero-act"><a class="btn btn-pri" style="width:auto" href="/generate">{{ icon('plus') }}<span>Jadwalkan Postingan</span></a></div>
+</section>
+
+<div style="display:flex;gap:10px;flex-wrap:wrap">
+<a class="pill pill-pri" style="text-decoration:none" href="/jadwal">Terjadwal {{queued|length}}</a>
+<span class="pill pill-mut">Draft {{drafts|length}}</span>
+<span class="pill pill-ok">Terbit {{posted_month}}</span>
+</div>
+
+<div class="grid2">
+<div style="display:flex;flex-direction:column;gap:16px">
+{% for j in queued %}
+<div class="job">
+<div class="jb">
+<div class="job-time">{{(j.scheduled_at or "")[:16]}} - {{j.nama}}</div>
+<p style="margin:8px 0;font-size:13px">{{j.caption_hasil_ai[:220]}}</p>
+<div style="font-size:12px;color:var(--outline)">Target: <strong style="color:var(--on)">{{j.label}}</strong> ({{j.platform}}) - <span class="shop-link">{{j.link_shopee[:60]}}</span></div>
+</div>
+<div><span class="pill pill-pri">Antrean</span></div>
+</div>
+{% else %}
+<div class="card"><p class="sub">Antrean kosong. Scheduler generate otomatis tiap 5 menit sesuai jadwal akun, atau buat manual dari Generate AI.</p></div>
+{% endfor %}
+</div>
+<aside style="display:flex;flex-direction:column;gap:16px">
+<div class="card">
+<h2>{{ icon('cog-6-tooth') }} Pengaturan Jadwal per Akun</h2>
+<p class="sub">Scheduler cek tiap 5 menit: jam aktif + jeda (24/post_per_hari + jitter 5-25 menit). Dedup 14 hari per akun-produk.</p>
+{% for r in rows %}
+<form class="f" method="post" action="/jadwal/{{r.id}}" style="border-bottom:1px solid var(--oline);padding-bottom:12px;margin-bottom:12px">
+<div style="font-weight:700">{{r.label}} <span style="font-weight:400;color:var(--outline)">({{r.platform}})</span></div>
+<div class="frow">
+<div><label class="lb">Post/hari</label><input class="in" name="posts_per_day" type="number" value="{{r.posts_per_day}}"/></div>
+<div><label class="lb">Mulai</label><input class="in" name="hour_start" type="number" value="{{r.active_hour_start}}"/></div>
+<div><label class="lb">Selesai</label><input class="in" name="hour_end" type="number" value="{{r.active_hour_end}}"/></div>
+</div>
+<button class="btn btn-ghost btn-sm">Simpan</button>
+</form>
+{% endfor %}
+</div>
+<div class="card">
+<h2>{{ icon('check-circle') }} Kuota Hari Ini</h2>
+<p class="sub">Postingan terbit hari ini per akun.</p>
+{% for q in quota %}
+<div style="margin-bottom:12px"><div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px"><span>{{q.label}}</span><span><strong>{{q.today}}</strong>/{{q.posts_per_day}}</span></div>
+<div style="height:8px;background:var(--highest);border-radius:4px"><div style="height:8px;background:var(--tercon);border-radius:4px;width:{{q.pct}}%"></div></div></div>
+{% else %}<p class="sub">Belum ada data.</p>{% endfor %}
+</div>
+</aside>
+</div>
+{% endblock %}

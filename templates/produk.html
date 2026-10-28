@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Produk - Omnipost{% endblock %}
+{% block htitle %}Produk Affiliate{% endblock %}
+{% block hsub %}List produk Shopee siap dipromosikan AI{% endblock %}
+{% from "base.html" import icon %}
+{% block body %}
+<div class="grid2">
+<div class="card">
+<h2>{{ icon('plus') }} Tambah Produk</h2>
+<p class="sub">Isi link affiliate + deskripsi produk apa, AI yang bikin ceritanya.</p>
+<form class="f" method="post">
+<label class="lb">Nama produk</label><input class="in" name="nama" placeholder="nama produk" required/>
+<label class="lb">Link Shopee affiliate</label><input class="in" name="link_shopee" placeholder="https://shopee.co.id/..." required/>
+<label class="lb">Deskripsi (ini produk apa, buat apa)</label><textarea class="in" name="deskripsi" rows="3"></textarea>
+<label class="lb">Kategori</label><input class="in" name="kategori" placeholder="kategori"/>
+<button class="btn btn-pri" style="width:auto">Tambah</button>
+</form>
+<form class="f" method="post" enctype="multipart/form-data" style="margin-top:16px;border-top:1px solid var(--oline);padding-top:16px">
+<label class="lb">Import CSV (kolom: nama,link_shopee,deskripsi,kategori)</label>
+<input class="in" type="file" name="csv" accept=".csv"/>
+<button class="btn btn-ghost btn-sm" style="width:auto">Import CSV</button>
+</form>
+</div>
+<div class="card">
+<h2>{{ icon('shopping-bag') }} List Produk ({{rows|length}})</h2>
+<p class="sub">Produk aktif ikut antrean scheduler.</p>
+<table class="tbl"><tr><th>ID</th><th>Nama</th><th>Link</th><th>Deskripsi</th></tr>
+{% for r in rows %}<tr><td>{{r.id}}</td><td>{{r.nama}}</td><td><a class="shop-link" href="{{r.link_shopee}}">link</a></td><td>{{r.deskripsi[:120]}}</td></tr>{% endfor %}
+</table>
+</div>
+</div>
+{% endblock %}

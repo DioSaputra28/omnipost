@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Masuk - Omnipost</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}"/>
+</head>
+<body>
+{% include "_sprite.html" %}
+{% macro icon(n) %}<svg width="20" height="20" viewBox="0 0 24 24" fill="none"><use href="#i-{{ n }}"/></svg>{% endmacro %}
+<div class="login-wrap">
+<div class="login-card">
+<div class="brand">
+<div class="brand-mark">{{ icon('squares-2x2') }}</div>
+<div><div class="brand-name">Omnipost</div><div class="brand-sub">Affiliate Autopost</div></div>
+</div>
+<h2 class="fh" style="font-size:24px;margin-bottom:4px">Masuk{% if first_run %} - buat akun dulu{% endif %}</h2>
+<p class="sub" style="font-size:12px;color:var(--outline);margin:0 0 20px">Personal use, single user.</p>
+{% with m=get_flashed_messages() %}{% if m %}{% for x in m %}<div class="flash">{{x}}</div>{% endfor %}{% endif %}{% endwith %}
+<form class="f" method="post">
+<label class="lb">Username</label><input class="in" name="username" placeholder="username" required/>
+<label class="lb">Password</label><input class="in" name="password" type="password" placeholder="password" required/>
+<button class="btn btn-pri">Masuk</button>
+</form>
+</div>
+</div>
+</body>
+</html>

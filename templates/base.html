@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>{% block title %}Omnipost{% endblock %}</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}"/>
+</head>
+<body>
+{% include "_sprite.html" %}
+{% macro icon(n) %}<svg width="20" height="20" viewBox="0 0 24 24" fill="none"><use href="#i-{{ n }}"/></svg>{% endmacro %}
+<div class="layout">
+<aside class="side">
+<div class="side-top">
+<div class="brand">
+<div class="brand-mark">{{ icon('squares-2x2') }}</div>
+<div><div class="brand-name">Omnipost</div><div class="brand-sub">Affiliate Autopost</div></div>
+</div>
+<a class="btn btn-pri" href="/generate">{{ icon('plus-circle') }}<span>Buat Postingan</span></a>
+<nav class="nav">
+<a href="/" class="{% if nav=='dash' %}on{% endif %}">{{ icon('squares-2x2') }}<span>Dashboard</span></a>
+<a href="/akun" class="{% if nav=='akun' %}on{% endif %}">{{ icon('users') }}<span>Akun Sosmed</span></a>
+<a href="/produk" class="{% if nav=='produk' %}on{% endif %}">{{ icon('shopping-bag') }}<span>Produk</span></a>
+<a href="/generate" class="{% if nav=='gen' %}on{% endif %}">{{ icon('sparkles') }}<span>Generate AI</span></a>
+<a href="/jadwal" class="{% if nav=='jadwal' %}on{% endif %}">{{ icon('calendar-days') }}<span>Jadwal Postingan</span></a>
+<a href="/setting-ai" class="{% if nav=='setting' %}on{% endif %}">{{ icon('cog-6-tooth') }}<span>Setting AI</span></a>
+</nav>
+</div>
+<div class="side-bot">
+<nav class="nav">
+<a href="/logout" style="color:var(--err)">{{ icon('arrow-right-on-rectangle') }}<span>Logout</span></a>
+</nav>
+</div>
+</aside>
+<div class="main">
+<header class="top"><div class="top-in">
+<div><div class="top-title">{% block htitle %}Omnipost{% endblock %}</div><div class="top-sub">{% block hsub %}{% endblock %}</div></div>
+<div><span class="pill pill-ok"><span style="width:8px;height:8px;border-radius:50%;background:var(--ter)"></span>Scheduler aktif</span></div>
+</div></header>
+<div class="content">
+{% with m=get_flashed_messages() %}{% if m %}{% for x in m %}<div class="flash">{{x}}</div>{% endfor %}{% endif %}{% endwith %}
+{% block body %}{% endblock %}
+</div>
+</div>
+</div>
+</body>
+</html>

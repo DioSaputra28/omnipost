@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% block title %}Dashboard - Omnipost{% endblock %}
+{% block htitle %}Social Hub Suite{% endblock %}
+{% block hsub %}Antrean Multi-Saluran dan Jadwal Otomatis{% endblock %}
+{% from "base.html" import icon %}
+{% block body %}
+<section class="hero">
+<div>
+<div style="margin-bottom:12px"><span class="pill pill-ok"><span style="width:6px;height:6px;border-radius:50%;background:var(--ter)"></span>Semua channel berjalan optimal</span></div>
+<h1>Selamat datang kembali</h1>
+<p>Ada <strong style="color:var(--ter)">{{queued}} postingan dalam antrean</strong>. {{stats.posted}} sudah terbit, {{stats.failed}} gagal.</p>
+</div>
+<div class="hero-act">
+<a class="btn btn-ghost" href="/akun">{{ icon('link') }}<span>Hubungkan Akun Baru</span></a>
+<a class="btn btn-pri" style="width:auto" href="/jadwal">{{ icon('calendar-days') }}<span>Jadwalkan Konten</span></a>
+</div>
+</section>
+
+<section class="kpis">
+<div class="card">
+<div class="kpi-top"><span class="kpi-label">Total Akun Terhubung</span><span class="kpi-ic">{{ icon('users') }}</span></div>
+<div class="kpi-num">{{stats.akun}}</div>
+<div class="kpi-delta">{{ icon('check-circle') }}<span>{{stats.akun_aktif}} aktif</span></div>
+</div>
+<div class="card">
+<div class="kpi-top"><span class="kpi-label">Produk Affiliate Aktif</span><span class="kpi-ic">{{ icon('shopping-bag') }}</span></div>
+<div class="kpi-num">{{stats.produk}}</div>
+<div class="kpi-delta">{{ icon('link') }}<span>siap dipromosikan</span></div>
+</div>
+<div class="card">
+<div class="kpi-top"><span class="kpi-label">Postingan Terbit</span><span class="kpi-ic">{{ icon('check-circle') }}</span></div>
+<div class="kpi-num">{{stats.posted}} <span style="font-size:15px;font-weight:400;color:var(--outline)">Post</span></div>
+<div class="kpi-delta">{{ icon('arrow-trending-up') }}<span>{{rate}}% success rate</span></div>
+</div>
+<div class="card">
+<div class="kpi-top"><span class="kpi-label">Antrean Menunggu</span><span class="kpi-ic">{{ icon('clock') }}</span></div>
+<div class="kpi-num">{{queued}} <span style="font-size:15px;font-weight:400;color:var(--outline)">Slot</span></div>
+<div class="kpi-delta">{{ icon('calendar-days') }}<span>{{stats.failed}} gagal perlu dicek</span></div>
+</div>
+</section>
+
+<div class="grid2">
+<div style="display:flex;flex-direction:column;gap:24px">
+<div class="card">
+<h2>{{ icon('bolt') }} Post Cepat Manual</h2>
+<p class="sub">Pilih akun dan produk, AI generate cerita lalu langsung posting.</p>
+<form class="f" method="post" action="/post-now">
+<div class="frow">
+<div><label class="lb">Akun</label><select class="in" name="account_id">{% for a in accs %}<option value="{{a.id}}">{{a.label}} ({{a.platform}})</option>{% endfor %}</select></div>
+<div><label class="lb">Produk (kosongkan = acak)</label><select class="in" name="product_id"><option value="">Acak (hindari dedup 14 hari)</option>{% for p in prods %}<option value="{{p.id}}">{{p.nama}}</option>{% endfor %}</select></div>
+</div>
+<button class="btn btn-pri">Generate dan Posting Sekarang</button>
+</form>
+</div>
+<div class="card">
+<h2>{{ icon('queue-list') }} Riwayat Postingan Terakhir</h2>
+<p class="sub">Bukti screenshot tersimpan tiap job sukses atau gagal.</p>
+<table class="tbl"><tr><th>ID</th><th>Akun</th><th>Produk</th><th>Status</th><th>Caption</th><th>Error</th></tr>
+{% for j in jobs %}<tr><td>{{j.id}}</td><td>{{j.label}} ({{j.platform}})</td><td>{{j.nama}}</td><td>{% if j.status=='posted' %}<span class="pill pill-ok">Terbit</span>{% elif j.status=='failed' %}<span class="pill pill-err">Gagal</span>{% else %}<span class="pill pill-mut">{{j.status}}</span>{% endif %}</td><td><div class="clip">{{j.caption_hasil_ai}}</div></td><td>{{(j.error or "-")[:80]}}</td></tr>{% endfor %}
+</table>
+</div>
+</div>
+<div style="display:flex;flex-direction:column;gap:24px">
+<div class="card">
+<h2>{{ icon('clock') }} Jadwal Hari Ini</h2>
+<p class="sub">{{today}}</p>
+{% for j in today_jobs %}<div class="job" style="margin-bottom:12px">
+<div class="jb"><div class="job-time">{{j.scheduled_at or "-"}} - {{j.nama}}</div>
+<div style="font-size:12px;color:var(--onvar)">{{j.label}} ({{j.platform}}) - <span class="shop-link">{{j.link_shopee[:60]}}</span></div></div>
+<div>{% if j.status=='posted' %}<span class="pill pill-ok">Siap Terbit</span>{% elif j.status=='failed' %}<span class="pill pill-err">Gagal</span>{% else %}<span class="pill pill-pri">Antrean</span>{% endif %}</div>
+</div>{% else %}<p class="sub">Belum ada jadwal hari ini. Atur di halaman Jadwal.</p>{% endfor %}
+<a class="btn btn-ghost" href="/jadwal">Lihat Seluruh Kalender</a>
+</div>
+<div class="card">
+<h2>{{ icon('light-bulb') }} Performa Akun</h2>
+<p class="sub">Jumlah postingan terbit per akun.</p>
+{% for a in perf %}<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--oline)">
+<div><div style="font-weight:700">{{a.label}}</div><div style="font-size:12px;color:var(--outline)">{{a.platform}}</div></div>
+<div style="text-align:right"><div style="font-weight:700;color:var(--ter)">{{a.posted}} post</div><div style="font-size:11px;color:var(--outline)">{{a.failed}} gagal</div></div>
+</div>{% else %}<p class="sub">Belum ada akun.</p>{% endfor %}
+</div>
+</div>
+</div>
+{% endblock %}
