@@ -75,15 +75,71 @@ def post(account, caption, job_id):
                     "composer Threads tidak ketemu (UI berubah?). URL saat ini: %s. "
                     "Screenshot debug tersimpan di storage/%s/shots/ (file _debug_no-box). "
                     "Buka manual di browser, lihat tombol/composer barunya kayak apa." % (page.url, account["id"]))
-            box.click()
-            page.wait_for_timeout(500)
-            try:
-                box.click()
-                page.keyboard.press("ControlOrMeta+a")
-                page.keyboard.press("Backspace")
+            cdp = ctx.new_cdp_session(page)
+
+            def _ev(expr):
+                try:
+                    r = cdp.send("Runtime.evaluate", {
+                        "expression": expr, "returnByValue": True, "awaitPromise": True,
+                    })
+                    return r.get("result", {}).get("value")
+                except Exception:  # noqa: BLE001
+                    return None
+
+            def _click(x, y):
+                cdp.send("Input.dispatchMouseEvent", {"type": "mouseMoved", "x": x, "y": y})
+                cdp.send("Input.dispatchMouseEvent", {
+                    "type": "mousePressed", "x": x, "y": y, "button": "left", "clickCount": 1})
+                cdp.send("Input.dispatchMouseEvent", {
+                    "type": "mouseReleased", "x": x, "y": y, "button": "left", "clickCount": 1})
+
+            def _focus_editor():
+                return _ev("""(() => {
+                    const els = [...document.querySelectorAll('[contenteditable="true"]')];
+                    if (!els.length) return 0;
+                    els[els.length - 1].focus();
+                    return els.length;
+                })()""")
+
+            def _insert(text):
+                _focus_editor()
                 page.wait_for_timeout(400)
-            except Exception:  # noqa: BLE001
-                pass
+                cdp.send("Input.insertText", {"text": text})
+                page.wait_for_timeout(1200)
+
+            def _card_box():
+                return _ev("""(() => {
+                    for (const bt of document.querySelectorAll('button, [role="button"]')) {
+                        const r = bt.getBoundingClientRect();
+                        if (r.width < 20 || r.width > 32 || r.height < 20 || r.height > 32) continue;
+                        const pEl = bt.querySelector('svg path');
+                        const d = pEl ? (pEl.getAttribute('d') || '') : '';
+                        if (d.indexOf('M17.44 4.44') !== 0) continue;
+                        let p = bt, depth = 0, hasLink = false;
+                        while (p && depth < 8) {
+                            const t = p.innerText || '';
+                            if (t.includes('shop.ee') || t.includes('shopee')) { hasLink = true; break; }
+                            p = p.parentElement; depth++;
+                        }
+                        if (!hasLink) continue;
+                        return {x: Math.round(r.x + r.width / 2), y: Math.round(r.y + r.height / 2)};
+                    }
+                    return null;
+                })()""")
+
+            def _post_box():
+                return _ev("""(() => {
+                    let hit = null;
+                    for (const bt of document.querySelectorAll('button, [role="button"]')) {
+                        if ((bt.textContent || '').trim() !== 'Post') continue;
+                        const r = bt.getBoundingClientRect();
+                        if (r.width === 0 || r.height === 0 || r.y < 200) continue;
+                        hit = {x: Math.round(r.x + r.width / 2), y: Math.round(r.y + r.height / 2),
+                               disabled: bt.disabled === true || bt.getAttribute('aria-disabled') === 'true'};
+                    }
+                    return hit;
+                })()""")
+
             import re as _re
             m = _re.search(r"https?://\S+", caption)
             link = m.group(0).rstrip(".,!?)") if m else ""
@@ -91,138 +147,81 @@ def post(account, caption, job_id):
             text_only = _re.sub(r"\s{2,}", " ", text_only)
             if not text_only:
                 text_only = "Hari ini nemu barang bagus, cek komen buat linknya"
-            try:
-                box.click()
-                for chunk in [text_only[i:i + 40] for i in range(0, len(text_only), 40)]:
-                    page.keyboard.type(chunk, delay=15)
-                    page.wait_for_timeout(120)
-                page.wait_for_timeout(1200)
-            except Exception:  # noqa: BLE001
-                try:
-                    box.fill(text_only)
-                    page.wait_for_timeout(1200)
-                except Exception:  # noqa: BLE001
-                    pass
+
             try:
                 if page.locator('text="Who can reply and quote"').count():
                     page.keyboard.press("Escape")
                     page.wait_for_timeout(800)
             except Exception:  # noqa: BLE001
                 pass
-            dialog = None
-            for sel in ['div[role="dialog"]', 'div[aria-modal="true"]']:
-                try:
-                    loc = page.locator(sel).first
-                    if loc.count() and loc.is_visible():
-                        dialog = loc
+
+            _insert((text_only + " " + link).strip() if link else text_only)
+
+            card_ok = True
+            if link:
+                card = None
+                for _ in range(12):
+                    card = _card_box()
+                    if card:
                         break
-                except Exception:  # noqa: BLE001
-                    pass
-            scope_prev = dialog if dialog else page
-            try:
-                x_btn = None
-                for b in scope_prev.locator('button, div[role="button"]').all():
-                    try:
-                        if not b.is_visible():
-                            continue
-                        bbx = b.bounding_box()
-                        if not bbx:
-                            continue
-                        w, h = bbx["width"], bbx["height"]
-                        if 18 <= w <= 34 and 18 <= h <= 34:
-                            try:
-                                txt = (b.inner_text() or "").strip()
-                            except Exception:  # noqa: BLE001
-                                txt = ""
-                            if txt:
-                                continue
-                            try:
-                                svg = b.locator("svg").count()
-                            except Exception:  # noqa: BLE001
-                                svg = 0
-                            x_btn = (b, bbx, svg)
+                    page.wait_for_timeout(1000)
+                log.info("preview card: %s", "muncul" if card else "tidak muncul")
+                if card:
+                    for attempt in range(2):
+                        _click(card["x"], card["y"])
+                        page.wait_for_timeout(1500)
+                        card = _card_box()
+                        log.info("hapus kartu #%d: %s", attempt + 1, "OK" if not card else "masih ada")
+                        if not card:
                             break
-                    except Exception:  # noqa: BLE001
-                        pass
-                if x_btn:
-                    try:
-                        x_btn[0].click()
-                        page.wait_for_timeout(800)
-                    except Exception:  # noqa: BLE001
-                        page.mouse.click(x_btn[1]["x"] + x_btn[1]["width"] / 2,
-                                          x_btn[1]["y"] + x_btn[1]["height"] / 2)
-                        page.wait_for_timeout(800)
-            except Exception:  # noqa: BLE001
-                pass
-            page.wait_for_timeout(1000)
-            dialog = None
-            for sel in ['div[role="dialog"]', 'div[aria-modal="true"]']:
-                try:
-                    loc = page.locator(sel).first
-                    if loc.count() and loc.is_visible():
-                        dialog = loc
-                        break
-                except Exception:  # noqa: BLE001
-                    pass
+                    card_ok = not card
+
+            post_btn = _post_box()
+            if link and (not card_ok or (post_btn and post_btn.get("disabled"))):
+                log.info("fallback: teks saja + link di reply")
+                _focus_editor()
+                page.keyboard.press("ControlOrMeta+a")
+                page.keyboard.press("Backspace")
+                page.wait_for_timeout(600)
+                _insert(text_only)
+                post_btn = _post_box()
+                link_in_post = False
+            else:
+                link_in_post = bool(link)
+
             posted = False
-            scope = dialog if dialog else page
-            best = None
             for _ in range(6):
-                try:
-                    cands = scope.locator("button").filter(has_text=re.compile(r"^\s*Post\s*$")).all()
-                    best, best_y, best_x = None, -1, -1
-                    for c in cands:
-                        try:
-                            if not (c.is_visible() and c.is_enabled()):
-                                continue
-                            bb = c.bounding_box()
-                            y, x = (bb["y"], bb["x"]) if bb else (0, 0)
-                            if (y, x) >= (best_y, best_x):
-                                best, best_y, best_x = c, y, x
-                        except Exception:  # noqa: BLE001
-                            pass
-                    if best:
-                        break
-                except Exception:  # noqa: BLE001
-                    pass
-                page.wait_for_timeout(2000)
-            if best:
-                try:
-                    best.click()
+                post_btn = _post_box()
+                if post_btn and not post_btn.get("disabled"):
+                    _click(post_btn["x"], post_btn["y"])
                     posted = True
-                except Exception:  # noqa: BLE001
-                    pass
+                    break
+                page.wait_for_timeout(2000)
             if not posted:
                 try:
-                    (dialog or page).keyboard.press("Control+Enter")
-                except Exception:  # noqa: BLE001
                     page.keyboard.press("Control+Enter")
-            page.wait_for_timeout(5000)
+                except Exception:  # noqa: BLE001
+                    pass
+            page.wait_for_timeout(12000)
             try:
                 still_open = False
                 for sel in ['text="Save to drafts?"', 'button:has-text("Don\'t save")']:
                     try:
                         if page.locator(sel).count():
                             still_open = True
-                            for ds in ['button:has-text("Don\'t save")']:
-                                try:
-                                    b = page.locator(ds).first
-                                    if b.count() and b.is_visible():
-                                        b.click()
-                                        page.wait_for_timeout(1500)
-                                except Exception:  # noqa: BLE001
-                                    pass
+                            b = page.locator('button:has-text("Don\'t save")').first
+                            if b.count() and b.is_visible():
+                                b.click()
+                                page.wait_for_timeout(1500)
                             break
                     except Exception:  # noqa: BLE001
                         pass
                 if not still_open:
-                    if dialog:
-                        try:
-                            still_open = dialog.is_visible()
-                        except Exception:  # noqa: BLE001
-                            still_open = False
-                    else:
-                        still_open = page.locator('div[role="textbox"]:has-text("%s")' % text_only[:20]).count() > 0
+                    still_open = bool(_ev("""(() => {
+                        const els = [...document.querySelectorAll('[contenteditable="true"]')];
+                        return els.length > 0 && els[els.length - 1].getBoundingClientRect().width > 0
+                            && document.body.innerText.indexOf('New thread') >= 0;
+                    })()"""))
                 if still_open:
                     _debug_shot(ctx, account["id"], job_id, "not-posted")
                     raise RuntimeError(
@@ -232,21 +231,20 @@ def post(account, caption, job_id):
                 raise
             except Exception:  # noqa: BLE001
                 pass
-            if link:
+
+            if link and not link_in_post:
                 try:
-                    page.wait_for_timeout(3000)
                     username = (account.get("username") or "").strip().lstrip("@")
                     if username:
                         page.goto("https://www.threads.com/@" + username, timeout=60000)
                         page.wait_for_timeout(5000)
-                    hint = text_only[:24]
-                    nav = page.evaluate("""(hint) => {
-                        for (const e of document.querySelectorAll('div,span')) {
-                            const t = (e.innerText || '').trim();
-                            if (t.startsWith(hint) && t.length < hint.length + 120) { e.click(); return 'clicked'; }
-                        }
-                        return 'no-post';
-                    }""", hint)
+                    import json as _json
+                    hint_js = _json.dumps(text_only[:24])
+                    nav = _ev("(() => { const hint = " + hint_js + ";"
+                              " for (const e of document.querySelectorAll('div,span')) {"
+                              " const t = (e.innerText || '').trim();"
+                              " if (t.startsWith(hint) && t.length < hint.length + 120) { e.click(); return 'clicked'; } }"
+                              " return 'no-post'; })()")
                     log.info("reply nav: %s", nav)
                     if nav == "clicked":
                         page.wait_for_timeout(5000)
@@ -264,36 +262,17 @@ def post(account, caption, job_id):
                         log.info("reply expand: %s", expanded)
                         if expanded:
                             page.wait_for_timeout(2500)
-                            editors = page.locator('[contenteditable="true"]').all()
-                            rbox = editors[-1] if editors else None
-                            if rbox:
-                                rbox.click()
-                                page.wait_for_timeout(500)
-                                for chunk in [link[i:i + 40] for i in range(0, len(link), 40)]:
-                                    page.keyboard.type(chunk, delay=15)
-                                    page.wait_for_timeout(100)
-                                page.wait_for_timeout(4000)
-                                posted_reply = False
-                                for _ in range(6):
-                                    res = page.evaluate("""() => {
-                                        let hit = null;
-                                        document.querySelectorAll('button, [role=\"button\"]').forEach(bt => {
-                                            const t = (bt.textContent || '').trim();
-                                            if (t === 'Post') {
-                                                const r = bt.getBoundingClientRect();
-                                                if (r.width > 0 && r.height > 0) hit = bt;
-                                            }
-                                        });
-                                        if (!hit) return 'no-btn';
-                                        hit.click();
-                                        return 'clicked';
-                                    }""")
-                                    if res == "clicked":
-                                        posted_reply = True
-                                        break
-                                    page.wait_for_timeout(2000)
-                                page.wait_for_timeout(4000)
-                                log.info("reply link: %s", "OK" if posted_reply else "GAGAL")
+                            _insert(link)
+                            posted_reply = False
+                            for _ in range(6):
+                                box = _post_box()
+                                if box and not box.get("disabled"):
+                                    _click(box["x"], box["y"])
+                                    posted_reply = True
+                                    break
+                                page.wait_for_timeout(2000)
+                            page.wait_for_timeout(5000)
+                            log.info("reply link: %s", "OK" if posted_reply else "GAGAL")
                 except Exception as e:  # noqa: BLE001
                     log.info("reply link skip: %s", str(e)[:150])
             shot = save_state_and_shot(ctx, state_path, account["id"], job_id)
