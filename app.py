@@ -685,6 +685,50 @@ def jadwal_save(aid):
     flash("jadwal tersimpan")
     return redirect(url_for("jadwal"))
 
+@app.route("/statistik")
+@login_required
+def statistik():
+    conn = get_conn()
+    rows = conn.execute(
+        "SELECT j.id, j.posted_at, j.caption_hasil_ai, s.label, s.platform, p.nama, "
+        "m.views, m.likes, m.replies, m.reposts, m.shares, m.checked_at, m.error, m.post_url "
+        "FROM jobs j JOIN social_accounts s ON s.id=j.account_id "
+        "JOIN products p ON p.id=j.product_id "
+        "LEFT JOIN post_metrics m ON m.job_id=j.id "
+        "WHERE j.status='posted' ORDER BY j.posted_at DESC LIMIT 60").fetchall()
+    total = conn.execute(
+        "SELECT COALESCE(SUM(views),0) v, COALESCE(SUM(likes),0) l, COALESCE(SUM(replies),0) r, "
+        "COALESCE(SUM(reposts),0) rp, COALESCE(SUM(shares),0) s FROM post_metrics").fetchone()
+    measured = conn.execute("SELECT COUNT(*) c FROM post_metrics WHERE checked_at != ''").fetchone()["c"]
+    conn.close()
+    return render_template("statistik.html", rows=rows, total=total, measured=measured, nav="statistik")
+
+@app.route("/statistik/refresh", methods=["POST"])
+@login_required
+def statistik_refresh():
+    from core.metrics import refresh_all
+    try:
+        n = refresh_all()
+    except Exception as e:  # noqa: BLE001
+        _log_error("statistik_refresh", e)
+        flash("Gagal ambil metrik, cek Log Error untuk detailnya.")
+        return redirect(url_for("statistik"))
+    flash(f"{n} postingan diperbarui metriknya" if n else "belum ada postingan yang perlu diperbarui")
+    return redirect(url_for("statistik"))
+
+@app.route("/statistik/<int:job_id>/refresh", methods=["POST"])
+@login_required
+def statistik_job_refresh(job_id):
+    from core.metrics import refresh_job
+    try:
+        ok, err = refresh_job(job_id)
+    except Exception as e:  # noqa: BLE001
+        _log_error("statistik_job_refresh", e)
+        flash("Gagal ambil metrik, cek Log Error untuk detailnya.")
+        return redirect(url_for("statistik"))
+    flash("metrik diperbarui" if ok else (err or "gagal ambil metrik"))
+    return redirect(url_for("statistik"))
+
 if __name__ == "__main__":
     init_db()
     start_scheduler()

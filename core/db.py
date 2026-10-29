@@ -56,6 +56,18 @@ CREATE TABLE IF NOT EXISTS settings (
     key TEXT PRIMARY KEY,
     value TEXT DEFAULT ''
 );
+CREATE TABLE IF NOT EXISTS post_metrics (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    job_id INTEGER UNIQUE NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
+    post_url TEXT DEFAULT '',
+    views INTEGER DEFAULT 0,
+    likes INTEGER DEFAULT 0,
+    replies INTEGER DEFAULT 0,
+    reposts INTEGER DEFAULT 0,
+    shares INTEGER DEFAULT 0,
+    checked_at TEXT DEFAULT '',
+    error TEXT DEFAULT ''
+);
 """
 
 def get_conn():

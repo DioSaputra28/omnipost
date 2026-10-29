@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% block title %}Statistik Postingan - Omnipost{% endblock %}
+{% block htitle %}Statistik Postingan{% endblock %}
+{% block hsub %}Performa tiap postingan yang sudah terbit{% endblock %}
+{% from "base.html" import icon %}
+{% block body %}
+<section class="hero">
+<div>
+<h1 style="font-size:24px">Performa Konten</h1>
+<p>{{ measured }} postingan sudah diukur. Metrik diambil dari profil Threads otomatis tiap 3 jam.</p>
+</div>
+<div class="hero-act">
+<form method="post" action="/statistik/refresh">
+<button class="btn btn-pri" style="width:auto">{{ icon('arrow-path') }}<span>Perbarui Metrik</span></button>
+</form>
+</div>
+</section>
+
+<section class="kpis">
+<div class="card">
+<div class="kpi-top"><span class="kpi-label">Total Views</span><span class="kpi-ic">{{ icon('eye') }}</span></div>
+<div class="kpi-num">{{ total.v }}</div>
+<div class="kpi-delta">{{ icon('chart-bar') }}<span>tayangan postingan</span></div>
+</div>
+<div class="card">
+<div class="kpi-top"><span class="kpi-label">Total Likes</span><span class="kpi-ic">{{ icon('arrow-trending-up') }}</span></div>
+<div class="kpi-num">{{ total.l }}</div>
+<div class="kpi-delta">{{ icon('check-circle') }}<span>suka dari penonton</span></div>
+</div>
+<div class="card">
+<div class="kpi-top"><span class="kpi-label">Total Komentar</span><span class="kpi-ic">{{ icon('queue-list') }}</span></div>
+<div class="kpi-num">{{ total.r }}</div>
+<div class="kpi-delta">{{ icon('document-text') }}<span>balasan masuk</span></div>
+</div>
+<div class="card">
+<div class="kpi-top"><span class="kpi-label">Repost + Share</span><span class="kpi-ic">{{ icon('arrow-path') }}</span></div>
+<div class="kpi-num">{{ total.rp + total.s }}</div>
+<div class="kpi-delta">{{ icon('link') }}<span>{{ total.rp }} repost, {{ total.s }} share</span></div>
+</div>
+</section>
+
+<div class="card">
+<h2>{{ icon('chart-bar') }} Rincian per Postingan</h2>
+<p class="sub">Angka diambil dari halaman postingan Threads. Tombol Cek mengambil ulang data satu postingan.</p>
+<div style="overflow-x:auto">
+<table class="tbl">
+<thead>
+<tr>
+<th>Terbit</th><th>Akun</th><th>Produk</th><th>Views</th><th>Likes</th><th>Komentar</th><th>Repost</th><th>Share</th><th>Dicek</th><th></th>
+</tr>
+</thead>
+<tbody>
+{% for r in rows %}
+<tr>
+<td style="white-space:nowrap">{{ (r.posted_at or "")[:16] }}</td>
+<td><strong>{{ r.label }}</strong><div style="font-size:11px;color:var(--outline)">{{ r.platform }}</div></td>
+<td>{{ r.nama }}<div style="font-size:11px;color:var(--outline);max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ r.caption_hasil_ai[:80] }}</div></td>
+{% if r.checked_at %}
+<td>{{ r.views }}</td><td>{{ r.likes }}</td><td>{{ r.replies }}</td><td>{{ r.reposts }}</td><td>{{ r.shares }}</td>
+<td style="white-space:nowrap;font-size:11px;color:var(--outline)">{{ (r.checked_at or "")[:16] }}</td>
+{% else %}
+<td colspan="6" style="color:var(--outline)">{{ r.error or "belum diukur" }}</td>
+{% endif %}
+<td>
+<form method="post" action="/statistik/{{ r.id }}/refresh">
+<button class="btn btn-ghost btn-sm">Cek</button>
+</form>
+</td>
+</tr>
+{% else %}
+<tr><td colspan="10" class="sub">Belum ada postingan terbit.</td></tr>
+{% endfor %}
+</tbody>
+</table>
+</div>
+</div>
+{% endblock %}

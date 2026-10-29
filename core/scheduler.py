@@ -130,8 +130,10 @@ def start_scheduler():
     if _scheduler:
         return _scheduler
     from core.session_guard import refresh_all_sessions
+    from core.metrics import refresh_all as refresh_metrics
     _scheduler = BackgroundScheduler()
     _scheduler.add_job(tick, "interval", minutes=5)
     _scheduler.add_job(refresh_all_sessions, "interval", hours=6, kwargs={"max_age_hours": 20})
+    _scheduler.add_job(refresh_metrics, "interval", hours=3)
     _scheduler.start()
     return _scheduler
