@@ -251,68 +251,76 @@ def post(account, caption, job_id):
                     if username:
                         page.goto("https://www.threads.com/@" + username, timeout=60000)
                         page.wait_for_timeout(5000)
-                    clicked_reply = False
-                    arts = page.locator("article").all()
-                    for art in arts[:3]:
-                        try:
-                            if not art.is_visible():
-                                continue
-                            for sel in ['a[aria-label*="Reply" i]', 'a[href*="/reply" i]',
-                                        'button[aria-label*="Reply" i]', 'div[role="button"][aria-label*="Reply" i]']:
-                                for el in art.locator(sel).all()[:2]:
-                                    try:
-                                        if el.is_visible():
-                                            el.click()
-                                            clicked_reply = True
-                                            break
-                                    except Exception:  # noqa: BLE001
-                                        pass
-                                if clicked_reply:
-                                    break
-                        except Exception:  # noqa: BLE001
-                            pass
-                        if clicked_reply:
-                            break
-                    if not clicked_reply:
-                        page.keyboard.press("r")
-                    page.wait_for_timeout(2500)
-                    rbox = None
-                    for sel in ['div[role="textbox"]', '[contenteditable="true"]']:
-                        try:
-                            loc = page.locator(sel).first
-                            loc.wait_for(state="visible", timeout=8000)
-                            rbox = loc
-                            break
-                        except Exception:  # noqa: BLE001
-                            pass
-                    if rbox:
-                        rbox.click()
-                        page.wait_for_timeout(500)
-                        for chunk in [link[i:i + 40] for i in range(0, len(link), 40)]:
-                            page.keyboard.type(chunk, delay=15)
-                            page.wait_for_timeout(120)
-                        page.wait_for_timeout(2500)
-                        posted2 = False
-                        for _ in range(6):
+                    hint = text_only[:24]
+                    opened = page.evaluate("""(hint) => {
+                        let node = null;
+                        for (const e of document.querySelectorAll('div,span')) {
+                            const t = (e.innerText || '').trim();
+                            if (t.startsWith(hint) && t.length < hint.length + 120) { node = e; break; }
+                        }
+                        if (!node) return 'no-post';
+                        let box = node;
+                        for (let i = 0; i < 10; i++) {
+                            if (!box.parentElement) break;
+                            box = box.parentElement;
+                            if (box.querySelectorAll('[role="button"]').length >= 3) break;
+                        }
+                        for (const bt of box.querySelectorAll('[role="button"], button')) {
+                            const pEl = bt.querySelector('svg path');
+                            const d = pEl ? (pEl.getAttribute('d') || '') : '';
+                            if (d && d.indexOf('M12 3a9 9 0 0 0 0 18c1.414') === 0) {
+                                bt.click();
+                                return 'opened';
+                            }
+                        }
+                        return 'no-reply-btn';
+                    }""", hint)
+                    log.info("reply open: %s", opened)
+                    if opened == "opened":
+                        page.wait_for_timeout(3000)
+                        rbox = None
+                        for sel in ['[contenteditable="true"]', 'div[role="textbox"]']:
                             try:
-                                rc = page.locator("button").filter(has_text=re.compile(r"^\s*Reply\s*$")).all()
-                                rbest = None
-                                for c in rc:
-                                    try:
-                                        if c.is_visible() and c.is_enabled():
-                                            rbest = c
-                                            break
-                                    except Exception:  # noqa: BLE001
-                                        pass
-                                if rbest:
-                                    rbest.click()
-                                    posted2 = True
-                                    break
+                                loc = page.locator(sel).first
+                                loc.wait_for(state="visible", timeout=8000)
+                                rbox = loc
+                                break
                             except Exception:  # noqa: BLE001
                                 pass
-                            page.wait_for_timeout(2000)
-                        page.wait_for_timeout(4000)
-                        log.info("reply link: %s", "OK" if posted2 else "GAGAL")
+                        if rbox:
+                            rbox.click()
+                            page.wait_for_timeout(400)
+                            for chunk in [link[i:i + 40] for i in range(0, len(link), 40)]:
+                                page.keyboard.type(chunk, delay=15)
+                                page.wait_for_timeout(100)
+                            page.wait_for_timeout(3000)
+                            sent = False
+                            for _ in range(6):
+                                try:
+                                    res = page.evaluate("""() => {
+                                        let best = null, bestX = -1;
+                                        document.querySelectorAll('[role="button"], button').forEach(bt => {
+                                            const r = bt.getBoundingClientRect();
+                                            if (r.width === 0 || r.width > 60 || r.height > 60) return;
+                                            if (r.y < 150) return;
+                                            const bg = getComputedStyle(bt).backgroundColor;
+                                            const pEl = bt.querySelector('svg path');
+                                            const d = pEl ? (pEl.getAttribute('d') || '') : '';
+                                            const isSend = bg === 'rgb(0, 0, 0)' && d && d.indexOf('M1 6h10') === 0;
+                                            if (isSend && r.x > bestX) { best = bt; bestX = r.x; }
+                                        });
+                                        if (!best) return 'no-send';
+                                        best.click();
+                                        return 'sent';
+                                    }""")
+                                except Exception:  # noqa: BLE001
+                                    res = "err"
+                                if res == "sent":
+                                    sent = True
+                                    break
+                                page.wait_for_timeout(2000)
+                            page.wait_for_timeout(4000)
+                            log.info("reply link: %s", "OK" if sent else "GAGAL")
                 except Exception as e:  # noqa: BLE001
                     log.info("reply link skip: %s", str(e)[:150])
             shot = save_state_and_shot(ctx, state_path, account["id"], job_id)
