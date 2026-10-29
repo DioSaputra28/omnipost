@@ -155,7 +155,62 @@ def post(account, caption, job_id):
             except Exception:  # noqa: BLE001
                 pass
 
-            _insert((text_only + " " + link).strip() if link else text_only)
+            def _editors():
+                raw = _ev("""(() => {
+                    return JSON.stringify([...document.querySelectorAll('[contenteditable="true"]')].map(e => {
+                        const r = e.getBoundingClientRect();
+                        return {x: Math.round(r.x + r.width / 2),
+                                y: Math.round(r.y + Math.min(r.height / 2, 12)),
+                                txt: (e.innerText || '').slice(0, 30)};
+                    }).filter(o => o.x > 0));
+                })()""")
+                try:
+                    import json as _json
+                    return _json.loads(raw) if raw else []
+                except Exception:  # noqa: BLE001
+                    return []
+
+            def _click_editor(idx):
+                eds = _editors()
+                if not eds:
+                    return False
+                e = eds[idx]
+                _click(e["x"], e["y"])
+                page.wait_for_timeout(400)
+                return True
+
+            def _add_thread_box():
+                return _ev("""(() => {
+                    let best = null;
+                    for (const el of document.querySelectorAll('div,span,button,[role="button"]')) {
+                        if ((el.textContent || '').trim() !== 'Add to thread') continue;
+                        const r = el.getBoundingClientRect();
+                        if (r.width < 40 || r.width > 200 || r.height > 40 || r.height === 0) continue;
+                        if (!best || r.y > best.y) best = {x: Math.round(r.x + r.width / 2), y: Math.round(r.y + r.height / 2)};
+                    }
+                    return best;
+                })()""")
+
+            _focus_editor()
+            page.wait_for_timeout(400)
+            cdp.send("Input.insertText", {"text": text_only})
+            page.wait_for_timeout(1200)
+
+            mode = "inline"
+            if link:
+                at = _add_thread_box()
+                if at:
+                    _click(at["x"], at["y"])
+                    page.wait_for_timeout(2500)
+                if len(_editors()) >= 2:
+                    mode = "thread"
+                    _click_editor(-1)
+                    cdp.send("Input.insertText", {"text": link})
+                else:
+                    mode = "inline"
+                    cdp.send("Input.insertText", {"text": " " + link})
+                page.wait_for_timeout(1500)
+                log.info("mode link: %s", mode)
 
             card_ok = True
             if link:
@@ -177,17 +232,17 @@ def post(account, caption, job_id):
                     card_ok = not card
 
             post_btn = _post_box()
+            link_in_post = bool(link) and card_ok
             if link and (not card_ok or (post_btn and post_btn.get("disabled"))):
                 log.info("fallback: teks saja + link di reply")
-                _focus_editor()
+                _click_editor(-1)
                 page.keyboard.press("ControlOrMeta+a")
                 page.keyboard.press("Backspace")
-                page.wait_for_timeout(600)
-                _insert(text_only)
-                post_btn = _post_box()
+                page.wait_for_timeout(800)
+                if mode == "inline":
+                    cdp.send("Input.insertText", {"text": text_only})
+                    page.wait_for_timeout(1200)
                 link_in_post = False
-            else:
-                link_in_post = bool(link)
 
             posted = False
             for _ in range(6):
