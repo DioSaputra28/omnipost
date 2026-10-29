@@ -208,6 +208,43 @@ def refresh_all(max_jobs=MAX_JOBS):
     return updated
 
 
+def refresh_jobs(job_ids):
+    from core.scheduler import LOCK
+
+    if not job_ids:
+        return 0
+    marks = ",".join("?" * len(job_ids))
+    conn = get_conn()
+    rows = conn.execute(
+        f"""SELECT j.id, j.account_id, j.caption_hasil_ai, j.posted_at, m.post_url
+            FROM jobs j LEFT JOIN post_metrics m ON m.job_id = j.id
+            WHERE j.id IN ({marks})""", list(job_ids)).fetchall()
+    conn.close()
+    if not rows:
+        return 0
+
+    grouped = defaultdict(list)
+    for r in rows:
+        grouped[r["account_id"]].append(dict(r))
+
+    updated = 0
+    for account_id, jobs in grouped.items():
+        if not LOCK.acquire(blocking=False):
+            continue
+        try:
+            conn = get_conn()
+            acc = conn.execute("SELECT * FROM social_accounts WHERE id=?", (account_id,)).fetchone()
+            conn.close()
+            if not acc:
+                continue
+            _refresh_batch(dict(acc), jobs)
+            updated += len(jobs)
+        except Exception as e:  # noqa: BLE001
+            log.info("metrics akun %s gagal: %s", account_id, str(e)[:150])
+        finally:
+            LOCK.release()
+    return updated
+
 def refresh_job(job_id):
     from core.scheduler import LOCK
 

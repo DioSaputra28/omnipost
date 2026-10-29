@@ -15,6 +15,8 @@ Web app personal-use (single user) untuk auto-posting produk affiliate Shopee ke
 - **Scheduler** — per akun: post/hari, jam aktif, cek tiap 5 menit + jitter 5–25 menit, dedup (akun+produk) 14 hari, antre 1-1 bergantian
 - **Anti-spam** — proxy per akun + 102 pilihan user-agent (tanda mana yang sudah dipakai akun lain)
 - **Bukti posting** — screenshot tiap job sukses/gagal di `storage/<id>/shots/`
+- **Statistik per postingan** — views, likes, komentar, repost, share dicatat otomatis tiap 3 jam (maks 8 post/putaran, umur ≤14 hari). Scrape dari halaman Threads karena tidak ada API resmi
+- **Link belakangan (mode ramai)** — postingan terbit tanpa link dulu; begitu views/likes lewat ambang yang kamu set, link Shopee otomatis ditempel sebagai lanjutan thread (self-reply, tanpa kartu preview). Dicek tiap 30 menit, jendela default 24 jam
 
 ## Requirement
 
@@ -129,6 +131,17 @@ Buka **Produk**: tambah manual (nama + link Shopee + deskripsi "ini produk apa" 
 Login → Setting AI → Hubungkan akun (cookies/login manual) → isi Persona
 → isi Produk → atur Jadwal → scheduler generate + posting otomatis
 ```
+
+### Link Shopee: langsung vs belakangan
+
+| Mode | Perilaku |
+|---|---|
+| Default | Link ikut di bagian ke-2 thread (`Add to thread`) saat posting, kartu preview dihapus sebelum Post |
+| Link belakangan | Cerita terbit dulu tanpa link. Scheduler cek metrik tiap 30 menit; kalau views/likes ≥ ambang, link ditempel sebagai self-reply. Lewat jendela waktu = `expired` |
+
+Batas waktu: Threads tidak menyediakan lagi tombol "Add to thread" setelah posting (menu `...` hanya berisi Insights, Copy link, Embed, Save, Pin reply, Archive, Reply options, Delete). Yang tetap bisa kapan saja adalah **self-reply** ke postingan sendiri, jadi fitur ini memakai jalur reply. Batas edit post: 15 menit (5 menit di versi awal).
+
+Atur di halaman **Statistik** → kartu "Link Otomatis Saat Ramai" (metrik pemicu, ambang, jendela jam).
 
 ## Struktur Project
 

@@ -690,7 +690,7 @@ def jadwal_save(aid):
 def statistik():
     conn = get_conn()
     rows = conn.execute(
-        "SELECT j.id, j.posted_at, j.caption_hasil_ai, s.label, s.platform, p.nama, "
+        "SELECT j.id, j.posted_at, j.caption_hasil_ai, j.link_status, j.link_added_at, s.label, s.platform, p.nama, "
         "m.views, m.likes, m.replies, m.reposts, m.shares, m.checked_at, m.error, m.post_url "
         "FROM jobs j JOIN social_accounts s ON s.id=j.account_id "
         "JOIN products p ON p.id=j.product_id "
@@ -701,7 +701,36 @@ def statistik():
         "COALESCE(SUM(reposts),0) rp, COALESCE(SUM(shares),0) s FROM post_metrics").fetchone()
     measured = conn.execute("SELECT COUNT(*) c FROM post_metrics WHERE checked_at != ''").fetchone()["c"]
     conn.close()
-    return render_template("statistik.html", rows=rows, total=total, measured=measured, nav="statistik")
+    cfg = {
+        "enabled": get_setting("autolink_enabled", "0"),
+        "metric": get_setting("autolink_metric", "views"),
+        "threshold": get_setting("autolink_threshold", "100"),
+        "window": get_setting("autolink_window_hours", "24"),
+    }
+    return render_template("statistik.html", rows=rows, total=total, measured=measured,
+                           cfg=cfg, nav="statistik")
+
+@app.route("/statistik/autolink", methods=["POST"])
+@login_required
+def statistik_autolink():
+    try:
+        threshold = int(request.form.get("threshold", 100) or 100)
+        window = int(request.form.get("window", 24) or 24)
+    except (TypeError, ValueError):
+        flash("angka ambang/jendela tidak valid")
+        return redirect(url_for("statistik"))
+    if threshold < 0 or not (1 <= window <= 168):
+        flash("ambang minimal 0 dan jendela 1-168 jam")
+        return redirect(url_for("statistik"))
+    metric = request.form.get("metric", "views")
+    if metric not in ("views", "likes"):
+        metric = "views"
+    set_setting("autolink_enabled", "1" if request.form.get("enabled") else "0")
+    set_setting("autolink_metric", metric)
+    set_setting("autolink_threshold", str(threshold))
+    set_setting("autolink_window_hours", str(window))
+    flash("pengaturan link otomatis tersimpan")
+    return redirect(url_for("statistik"))
 
 @app.route("/statistik/refresh", methods=["POST"])
 @login_required

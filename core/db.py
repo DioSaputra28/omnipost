@@ -87,6 +87,15 @@ def init_db():
     conn.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('ai_base_url', 'https://api.openai.com/v1')")
     conn.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('ai_api_key', '')")
     conn.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('ai_model', 'gpt-4o-mini')")
+    conn.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('autolink_enabled', '0')")
+    conn.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('autolink_metric', 'views')")
+    conn.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('autolink_threshold', '100')")
+    conn.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('autolink_window_hours', '24')")
+    jcols = [r["name"] for r in conn.execute("PRAGMA table_info(jobs)").fetchall()]
+    for col in ["link_status", "link_added_at"]:
+        if col not in jcols:
+            conn.execute(f"ALTER TABLE jobs ADD COLUMN {col} TEXT DEFAULT ''")
+            conn.commit()
     conn.commit()
     conn.close()
 

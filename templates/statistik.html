@@ -40,13 +40,43 @@
 </section>
 
 <div class="card">
+<h2>{{ icon('link') }} Link Otomatis Saat Ramai</h2>
+<p class="sub">Postingan terbit tanpa link dulu. Begitu metriknya lewat ambang, link Shopee otomatis ditempel sebagai lanjutan thread (self-reply).</p>
+<form class="f" method="post" action="/statistik/autolink">
+<label style="display:flex;align-items:center;gap:8px;margin-bottom:14px">
+<input type="checkbox" name="enabled" {% if cfg.enabled == '1' %}checked{% endif %} style="width:16px;height:16px"/>
+<span style="font-size:13px">Aktifkan mode link belakangan</span>
+</label>
+<div class="frow">
+<div>
+<label class="lb">Metrik pemicu</label>
+<select class="in" name="metric">
+<option value="views" {% if cfg.metric == 'views' %}selected{% endif %}>Views</option>
+<option value="likes" {% if cfg.metric == 'likes' %}selected{% endif %}>Likes</option>
+</select>
+</div>
+<div>
+<label class="lb">Ambang (minimal)</label>
+<input class="in" name="threshold" type="number" min="0" value="{{ cfg.threshold }}"/>
+</div>
+<div>
+<label class="lb">Jendela (jam)</label>
+<input class="in" name="window" type="number" min="1" max="168" value="{{ cfg.window }}"/>
+</div>
+</div>
+<button class="btn btn-ghost btn-sm">Simpan pengaturan</button>
+</form>
+<p class="sub" style="margin-top:12px;margin-bottom:0">Dicek tiap 30 menit. Lewat {{ cfg.window }} jam tanpa tembus ambang, link dianggap hangus (status <em>expired</em>).</p>
+</div>
+
+<div class="card">
 <h2>{{ icon('chart-bar') }} Rincian per Postingan</h2>
 <p class="sub">Angka diambil dari halaman postingan Threads. Tombol Cek mengambil ulang data satu postingan.</p>
 <div style="overflow-x:auto">
 <table class="tbl">
 <thead>
 <tr>
-<th>Terbit</th><th>Akun</th><th>Produk</th><th>Views</th><th>Likes</th><th>Komentar</th><th>Repost</th><th>Share</th><th>Dicek</th><th></th>
+<th>Terbit</th><th>Akun</th><th>Produk</th><th>Link</th><th>Views</th><th>Likes</th><th>Komentar</th><th>Repost</th><th>Share</th><th>Dicek</th><th></th>
 </tr>
 </thead>
 <tbody>
@@ -55,11 +85,18 @@
 <td style="white-space:nowrap">{{ (r.posted_at or "")[:16] }}</td>
 <td><strong>{{ r.label }}</strong><div style="font-size:11px;color:var(--outline)">{{ r.platform }}</div></td>
 <td>{{ r.nama }}<div style="font-size:11px;color:var(--outline);max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ r.caption_hasil_ai[:80] }}</div></td>
+<td style="white-space:nowrap">
+{% if r.link_status == 'added' %}<span class="pill pill-ok">nempel {{ (r.link_added_at or "")[11:16] }}</span>
+{% elif r.link_status == 'pending' %}<span class="pill pill-pri">nunggu ramai</span>
+{% elif r.link_status == 'expired' %}<span class="pill pill-mut">hangus</span>
+{% elif r.link_status == 'inline' %}<span class="pill pill-ok">sejak awal</span>
+{% else %}<span class="pill pill-mut">-</span>{% endif %}
+</td>
 {% if r.checked_at %}
 <td>{{ r.views }}</td><td>{{ r.likes }}</td><td>{{ r.replies }}</td><td>{{ r.reposts }}</td><td>{{ r.shares }}</td>
 <td style="white-space:nowrap;font-size:11px;color:var(--outline)">{{ (r.checked_at or "")[:16] }}</td>
 {% else %}
-<td colspan="6" style="color:var(--outline)">{{ r.error or "belum diukur" }}</td>
+<td colspan="7" style="color:var(--outline)">{{ r.error or "belum diukur" }}</td>
 {% endif %}
 <td>
 <form method="post" action="/statistik/{{ r.id }}/refresh">
@@ -68,7 +105,7 @@
 </td>
 </tr>
 {% else %}
-<tr><td colspan="10" class="sub">Belum ada postingan terbit.</td></tr>
+<tr><td colspan="11" class="sub">Belum ada postingan terbit.</td></tr>
 {% endfor %}
 </tbody>
 </table>

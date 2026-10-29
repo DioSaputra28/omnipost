@@ -14,7 +14,7 @@ def _debug_shot(ctx, account_id, job_id, tag):
         pass
     return path
 
-def post(account, caption, job_id):
+def post(account, caption, job_id, include_link=True):
     import re
     with sync_playwright() as p:
         browser, ctx, state_path = launch_context(p, account)
@@ -143,6 +143,8 @@ def post(account, caption, job_id):
             import re as _re
             m = _re.search(r"https?://\S+", caption)
             link = m.group(0).rstrip(".,!?)") if m else ""
+            if not include_link:
+                link = ""
             text_only = _re.sub(r"https?://\S+", "", caption).strip()
             text_only = _re.sub(r"\s{2,}", " ", text_only)
             if not text_only:
@@ -335,10 +337,118 @@ def post(account, caption, job_id):
         finally:
             browser.close()
 
-def post_to_platform(account, caption, job_id):
+def _cdp(cdp, expr):
+    try:
+        r = cdp.send("Runtime.evaluate", {"expression": expr, "returnByValue": True})
+        return r.get("result", {}).get("value")
+    except Exception:  # noqa: BLE001
+        return None
+
+def _cdp_click(cdp, x, y):
+    cdp.send("Input.dispatchMouseEvent", {"type": "mouseMoved", "x": x, "y": y})
+    cdp.send("Input.dispatchMouseEvent", {"type": "mousePressed", "x": x, "y": y, "button": "left", "clickCount": 1})
+    cdp.send("Input.dispatchMouseEvent", {"type": "mouseReleased", "x": x, "y": y, "button": "left", "clickCount": 1})
+
+_CARD_JS = """(() => {
+    for (const bt of document.querySelectorAll('button, [role="button"]')) {
+        const r = bt.getBoundingClientRect();
+        if (r.width < 20 || r.width > 32 || r.height < 20 || r.height > 32) continue;
+        const pEl = bt.querySelector('svg path');
+        const d = pEl ? (pEl.getAttribute('d') || '') : '';
+        if (d.indexOf('M17.44 4.44') !== 0) continue;
+        let p = bt, depth = 0, hasLink = false;
+        while (p && depth < 8) {
+            const t = p.innerText || '';
+            if (t.includes('shop.ee') || t.includes('shopee')) { hasLink = true; break; }
+            p = p.parentElement; depth++;
+        }
+        if (!hasLink) continue;
+        return {x: Math.round(r.x + r.width / 2), y: Math.round(r.y + r.height / 2)};
+    }
+    return null;
+})()"""
+
+def add_link_reply(account, post_url, link, job_id=None):
+    with sync_playwright() as p:
+        browser, ctx, state_path = launch_context(p, account)
+        try:
+            page = ctx.new_page()
+            cdp = ctx.new_cdp_session(page)
+            page.goto(post_url, timeout=60000)
+            page.wait_for_timeout(5000)
+
+            opened = _cdp(cdp, """(() => {
+                for (const el of document.querySelectorAll('div,span')) {
+                    const t = (el.innerText || '').trim();
+                    if (t.startsWith('Reply to ') && t.length < 60) { el.click(); return 'ok'; }
+                }
+                for (const e of document.querySelectorAll('[contenteditable="true"]')) { e.focus(); return 'editor'; }
+                return 'none';
+            })()""")
+            log.info("autolink reply buka: %s", opened)
+            if opened == "none":
+                return False
+            page.wait_for_timeout(1500)
+
+            expanded = _cdp(cdp, """(() => {
+                for (const bt of document.querySelectorAll('[role="button"], button')) {
+                    if (bt.getAttribute('aria-label') === 'Expand composer') { bt.click(); return 'ok'; }
+                }
+                return 'none';
+            })()""")
+            log.info("autolink reply expand: %s", expanded)
+            page.wait_for_timeout(3000)
+
+            _cdp(cdp, """(() => { const e=[...document.querySelectorAll('[contenteditable="true"]')]; if (e.length) e[e.length-1].focus(); })()""")
+            page.wait_for_timeout(400)
+            for chunk in [link[i:i + 40] for i in range(0, len(link), 40)]:
+                cdp.send("Input.insertText", {"text": chunk})
+                page.wait_for_timeout(120)
+
+            card = None
+            for _ in range(15):
+                card = _cdp(cdp, _CARD_JS)
+                if card:
+                    break
+                page.wait_for_timeout(1000)
+            log.info("autolink kartu: %s", "muncul" if card else "tidak muncul")
+            if card:
+                for attempt in range(2):
+                    _cdp_click(cdp, card["x"], card["y"])
+                    page.wait_for_timeout(1500)
+                    card = _cdp(cdp, _CARD_JS)
+                    log.info("autolink hapus kartu #%d: %s", attempt + 1, "OK" if not card else "masih ada")
+                    if not card:
+                        break
+
+            posted = False
+            for _ in range(6):
+                box = _cdp(cdp, """(() => {
+                    let hit = null;
+                    for (const bt of document.querySelectorAll('button, [role="button"]')) {
+                        if ((bt.textContent || '').trim() !== 'Post') continue;
+                        const r = bt.getBoundingClientRect();
+                        if (r.width === 0 || r.height === 0) continue;
+                        hit = {x: Math.round(r.x + r.width / 2), y: Math.round(r.y + r.height / 2),
+                               disabled: bt.disabled === true};
+                    }
+                    return hit;
+                })()""")
+                if box and not box.get("disabled"):
+                    _cdp_click(cdp, box["x"], box["y"])
+                    posted = True
+                    break
+                page.wait_for_timeout(2000)
+            page.wait_for_timeout(8000)
+            log.info("autolink reply: %s", "OK" if posted else "GAGAL")
+            return posted
+        finally:
+            browser.close()
+
+def post_to_platform(account, caption, job_id, include_link=True):
     plat = (account.get("platform") or "").lower()
     if plat == "threads":
-        return post(account, caption, job_id)
+        return post(account, caption, job_id, include_link=include_link)
     if plat == "instagram":
         from core.poster import instagram
         return instagram.post(account, caption, job_id)

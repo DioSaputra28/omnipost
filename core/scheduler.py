@@ -5,9 +5,9 @@ from datetime import datetime, timedelta
 
 from apscheduler.schedulers.background import BackgroundScheduler
 
-from core.db import get_conn
+from core.db import get_conn, get_setting
 from core.ai import generate_story
-from core.poster import post_to_platform
+from core.poster import post_to_platform, add_link_reply
 
 LOCK = threading.Lock()
 DEDUP_DAYS = int(os.getenv("DEDUP_DAYS", "14"))
@@ -64,11 +64,12 @@ def run_job_for_account(account_id, manual_product_id=None):
         conn.commit()
         conn.close()
 
+        autolink = (get_setting("autolink_enabled", "0") or "0") == "1"
         try:
-            shot = post_to_platform(dict(acc), caption, job_id)
+            shot = post_to_platform(dict(acc), caption, job_id, include_link=not autolink)
             conn = get_conn()
-            conn.execute("UPDATE jobs SET status='posted', posted_at=?, screenshot_path=? WHERE id = ?",
-                         (datetime.now().isoformat(), shot, job_id))
+            conn.execute("UPDATE jobs SET status='posted', posted_at=?, screenshot_path=?, link_status=? WHERE id = ?",
+                         (datetime.now().isoformat(), shot, "pending" if autolink else "inline", job_id))
             conn.execute("UPDATE social_accounts SET last_post_at=?, status='ok' WHERE id = ?",
                          (datetime.now().isoformat(), account_id))
             conn.commit()
@@ -123,6 +124,77 @@ def tick():
             except Exception:  # noqa: BLE001
                 pass
 
+def autolink_check():
+    if (get_setting("autolink_enabled", "0") or "0") != "1":
+        return 0
+    try:
+        metric = get_setting("autolink_metric", "views") or "views"
+        threshold = int(get_setting("autolink_threshold", "100") or 100)
+        window_h = int(get_setting("autolink_window_hours", "24") or 24)
+    except (TypeError, ValueError):
+        metric, threshold, window_h = "views", 100, 24
+
+    conn = get_conn()
+    rows = conn.execute(
+        """SELECT j.id, j.account_id, j.posted_at, p.link_shopee, m.post_url, m.views, m.likes, m.checked_at
+           FROM jobs j JOIN products p ON p.id = j.product_id
+           LEFT JOIN post_metrics m ON m.job_id = j.id
+           WHERE j.status = 'posted' AND j.link_status = 'pending'""").fetchall()
+    conn.close()
+
+    stale = []
+    fresh_cut = (datetime.now() - timedelta(minutes=30)).isoformat()
+    for r in rows:
+        if not r["post_url"] or not (r["checked_at"] or "") or (r["checked_at"] or "") < fresh_cut:
+            stale.append(r["id"])
+    if stale:
+        from core.metrics import refresh_jobs
+        refresh_jobs(stale)
+        conn = get_conn()
+        rows = conn.execute(
+            """SELECT j.id, j.account_id, j.posted_at, p.link_shopee, m.post_url, m.views, m.likes, m.checked_at
+               FROM jobs j JOIN products p ON p.id = j.product_id
+               LEFT JOIN post_metrics m ON m.job_id = j.id
+               WHERE j.status = 'posted' AND j.link_status = 'pending'""").fetchall()
+        conn.close()
+
+    done = 0
+    for r in rows:
+        try:
+            posted_at = datetime.fromisoformat(r["posted_at"])
+        except (TypeError, ValueError):
+            continue
+        if (datetime.now() - posted_at) > timedelta(hours=window_h):
+            conn = get_conn()
+            conn.execute("UPDATE jobs SET link_status='expired' WHERE id=?", (r["id"],))
+            conn.commit()
+            conn.close()
+            continue
+        value = (r["views"] or 0) if metric == "views" else (r["likes"] or 0)
+        if value < threshold:
+            continue
+        if not r["post_url"]:
+            continue
+        if not LOCK.acquire(blocking=False):
+            return done
+        try:
+            conn = get_conn()
+            acc = conn.execute("SELECT * FROM social_accounts WHERE id=?", (r["account_id"],)).fetchone()
+            conn.close()
+            if not acc:
+                continue
+            ok = add_link_reply(dict(acc), r["post_url"], r["link_shopee"], r["id"])
+            if ok:
+                conn = get_conn()
+                conn.execute("UPDATE jobs SET link_status='added', link_added_at=? WHERE id=?",
+                             (datetime.now().isoformat(), r["id"]))
+                conn.commit()
+                conn.close()
+                done += 1
+        finally:
+            LOCK.release()
+    return done
+
 _scheduler = None
 
 def start_scheduler():
@@ -135,5 +207,6 @@ def start_scheduler():
     _scheduler.add_job(tick, "interval", minutes=5)
     _scheduler.add_job(refresh_all_sessions, "interval", hours=6, kwargs={"max_age_hours": 20})
     _scheduler.add_job(refresh_metrics, "interval", hours=3)
+    _scheduler.add_job(autolink_check, "interval", minutes=30)
     _scheduler.start()
     return _scheduler
