@@ -234,93 +234,66 @@ def post(account, caption, job_id):
                 pass
             if link:
                 try:
-                    page.wait_for_timeout(4000)
+                    page.wait_for_timeout(3000)
                     username = (account.get("username") or "").strip().lstrip("@")
-                    if not username:
-                        try:
-                            for a in page.locator('a[href^="/@"]').all()[:20]:
-                                try:
-                                    href = a.get_attribute("href") or ""
-                                    if href.startswith("/@") and len(href) > 2:
-                                        username = href[2:].split("/")[0]
-                                        break
-                                except Exception:  # noqa: BLE001
-                                    pass
-                        except Exception:  # noqa: BLE001
-                            pass
                     if username:
                         page.goto("https://www.threads.com/@" + username, timeout=60000)
                         page.wait_for_timeout(5000)
                     hint = text_only[:24]
-                    opened = page.evaluate("""(hint) => {
-                        let node = null;
+                    nav = page.evaluate("""(hint) => {
                         for (const e of document.querySelectorAll('div,span')) {
                             const t = (e.innerText || '').trim();
-                            if (t.startsWith(hint) && t.length < hint.length + 120) { node = e; break; }
+                            if (t.startsWith(hint) && t.length < hint.length + 120) { e.click(); return 'clicked'; }
                         }
-                        if (!node) return 'no-post';
-                        let box = node;
-                        for (let i = 0; i < 10; i++) {
-                            if (!box.parentElement) break;
-                            box = box.parentElement;
-                            if (box.querySelectorAll('[role="button"]').length >= 3) break;
-                        }
-                        for (const bt of box.querySelectorAll('[role="button"], button')) {
-                            const pEl = bt.querySelector('svg path');
-                            const d = pEl ? (pEl.getAttribute('d') || '') : '';
-                            if (d && d.indexOf('M12 3a9 9 0 0 0 0 18c1.414') === 0) {
-                                bt.click();
-                                return 'opened';
-                            }
-                        }
-                        return 'no-reply-btn';
+                        return 'no-post';
                     }""", hint)
-                    log.info("reply open: %s", opened)
-                    if opened == "opened":
-                        page.wait_for_timeout(3000)
-                        rbox = None
-                        for sel in ['[contenteditable="true"]', 'div[role="textbox"]']:
+                    log.info("reply nav: %s", nav)
+                    if nav == "clicked":
+                        page.wait_for_timeout(5000)
+                        expanded = False
+                        for _ in range(3):
                             try:
-                                loc = page.locator(sel).first
-                                loc.wait_for(state="visible", timeout=8000)
-                                rbox = loc
-                                break
+                                loc = page.locator('[aria-label="Expand composer"]').first
+                                if loc.count() and loc.is_visible():
+                                    loc.click()
+                                    expanded = True
+                                    break
                             except Exception:  # noqa: BLE001
                                 pass
-                        if rbox:
-                            rbox.click()
-                            page.wait_for_timeout(400)
-                            for chunk in [link[i:i + 40] for i in range(0, len(link), 40)]:
-                                page.keyboard.type(chunk, delay=15)
-                                page.wait_for_timeout(100)
-                            page.wait_for_timeout(3000)
-                            sent = False
-                            for _ in range(6):
-                                try:
+                            page.wait_for_timeout(2000)
+                        log.info("reply expand: %s", expanded)
+                        if expanded:
+                            page.wait_for_timeout(2500)
+                            editors = page.locator('[contenteditable="true"]').all()
+                            rbox = editors[-1] if editors else None
+                            if rbox:
+                                rbox.click()
+                                page.wait_for_timeout(500)
+                                for chunk in [link[i:i + 40] for i in range(0, len(link), 40)]:
+                                    page.keyboard.type(chunk, delay=15)
+                                    page.wait_for_timeout(100)
+                                page.wait_for_timeout(4000)
+                                posted_reply = False
+                                for _ in range(6):
                                     res = page.evaluate("""() => {
-                                        let best = null, bestX = -1;
-                                        document.querySelectorAll('[role="button"], button').forEach(bt => {
-                                            const r = bt.getBoundingClientRect();
-                                            if (r.width === 0 || r.width > 60 || r.height > 60) return;
-                                            if (r.y < 150) return;
-                                            const bg = getComputedStyle(bt).backgroundColor;
-                                            const pEl = bt.querySelector('svg path');
-                                            const d = pEl ? (pEl.getAttribute('d') || '') : '';
-                                            const isSend = bg === 'rgb(0, 0, 0)' && d && d.indexOf('M1 6h10') === 0;
-                                            if (isSend && r.x > bestX) { best = bt; bestX = r.x; }
+                                        let hit = null;
+                                        document.querySelectorAll('button, [role=\"button\"]').forEach(bt => {
+                                            const t = (bt.textContent || '').trim();
+                                            if (t === 'Post') {
+                                                const r = bt.getBoundingClientRect();
+                                                if (r.width > 0 && r.height > 0) hit = bt;
+                                            }
                                         });
-                                        if (!best) return 'no-send';
-                                        best.click();
-                                        return 'sent';
+                                        if (!hit) return 'no-btn';
+                                        hit.click();
+                                        return 'clicked';
                                     }""")
-                                except Exception:  # noqa: BLE001
-                                    res = "err"
-                                if res == "sent":
-                                    sent = True
-                                    break
-                                page.wait_for_timeout(2000)
-                            page.wait_for_timeout(4000)
-                            log.info("reply link: %s", "OK" if sent else "GAGAL")
+                                    if res == "clicked":
+                                        posted_reply = True
+                                        break
+                                    page.wait_for_timeout(2000)
+                                page.wait_for_timeout(4000)
+                                log.info("reply link: %s", "OK" if posted_reply else "GAGAL")
                 except Exception as e:  # noqa: BLE001
                     log.info("reply link skip: %s", str(e)[:150])
             shot = save_state_and_shot(ctx, state_path, account["id"], job_id)
