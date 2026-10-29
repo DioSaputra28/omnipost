@@ -1,6 +1,6 @@
 # Omnipost — Autopost Affiliate Shopee
 
-Web app personal-use (single user) untuk auto-posting produk affiliate Shopee ke **Threads, Instagram, Facebook, dan X/Twitter**. Tanpa API resmi Meta/X — memakai **browser automation (Playwright + Chromium)** yang meniru manusia. **AI (OpenAI-compatible)** membuat cerita soft-selling yang disisipi link Shopee, mengikuti persona tiap akun. **Scheduler** jalan otomatis dengan jeda acak + jitter, dedup produk 14 hari, proxy & user-agent per akun.
+Web app personal-use (single user) untuk auto-posting produk affiliate Shopee ke **Threads, Instagram, Facebook, dan X/Twitter**. Tanpa API resmi Meta/X — memakai **browser automation (Playwright + Chromium)** yang meniru manusia. **AI (OpenAI-compatible)** membuat cerita soft-selling yang disisipi link Shopee, mengikuti persona tiap akun. **Scheduler** jalan otomatis dengan jeda acak + jitter, dedup produk 14 hari, proxy & user-agent per akun. Performa tiap postingan (views, likes, komentar, repost, share) direkam otomatis, dan link Shopee bisa ditahan dulu — baru ditempel setelah postingan ramai.
 
 ## Fitur
 
@@ -15,8 +15,10 @@ Web app personal-use (single user) untuk auto-posting produk affiliate Shopee ke
 - **Scheduler** — per akun: post/hari, jam aktif, cek tiap 5 menit + jitter 5–25 menit, dedup (akun+produk) 14 hari, antre 1-1 bergantian
 - **Anti-spam** — proxy per akun + 102 pilihan user-agent (tanda mana yang sudah dipakai akun lain)
 - **Bukti posting** — screenshot tiap job sukses/gagal di `storage/<id>/shots/`
-- **Statistik per postingan** — views, likes, komentar, repost, share dicatat otomatis tiap 3 jam (maks 8 post/putaran, umur ≤14 hari). Scrape dari halaman Threads karena tidak ada API resmi
-- **Link belakangan (mode ramai)** — postingan terbit tanpa link dulu; begitu views/likes lewat ambang yang kamu set, link Shopee otomatis ditempel sebagai lanjutan thread (self-reply, tanpa kartu preview). Dicek tiap 30 menit, jendela default 24 jam
+- **Statistik per postingan** — views, likes, komentar, repost, share direkam otomatis: halaman `/statistik` berisi KPI total, tabel rincian per postingan, tombol perbarui (batch) dan cek ulang per baris. Scrape dari halaman Threads karena tidak ada API resmi
+- **Link belakangan (mode ramai)** — postingan terbit tanpa link dulu; begitu views/likes lewat ambang yang kamu set, link Shopee otomatis ditempel sebagai self-reply (tanpa kartu preview). Dicek tiap 30 menit, jendela default 24 jam, status per job: `pending` → `added` / `expired`
+- **Gaya thread bersih** — link masuk bagian ke-2 thread (`Add to thread`), kartu preview link selalu dihapus sebelum tombol Post diklik
+- **Log error terstruktur** — setiap exception dapat ID unik (`ERR-HHMMSS-NNN`), traceback + konteks request tersimpan, bisa dibaca di halaman `/logs`
 
 ## Requirement
 
@@ -125,6 +127,30 @@ Buka **Produk**: tambah manual (nama + link Shopee + deskripsi "ini produk apa" 
 - **Dashboard**: post cepat manual (pilih akun, produk kosongkan = acak hindari dedup), riwayat 20 job, jadwal hari ini, performa per akun
 - **Jadwal**: antrean queued, setting per akun (post/hari, jam), kuota hari ini per akun. Scheduler otomatis: tiap akun yang due → pilih produk belum dipost 14 hari → generate AI → posting 1-1 → screenshot bukti
 
+### 6. Statistik & link belakangan
+
+Buka **Statistik** (sidebar). Isinya:
+
+- **KPI**: total views, total likes, total komentar, repost + share
+- **Tabel rincian**: waktu terbit, akun, produk, status link, views, likes, komentar, repost, share, waktu terakhir dicek
+- **Perbarui Metrik** — ambil ulang semua postingan yang due (batch)
+- **Cek** per baris — ambil ulang satu postingan saja
+
+Angka diambil dengan membuka profil (untuk dapat URL post) lalu halaman postingan. Format `1,2 rb` / `1.2K` / `1,2 jt` otomatis dinormalisasi jadi integer.
+
+**Mode link belakangan** (kartu "Link Otomatis Saat Ramai"):
+
+| Kolom | Arti |
+|---|---|
+| Aktifkan mode | Kalau dicentang, postingan berikutnya terbit **tanpa** link |
+| Metrik pemicu | `Views` atau `Likes` |
+| Ambang | Nilai minimal sebelum link ditempel (contoh: 100) |
+| Jendela (jam) | Batas waktu sejak posting (1–168 jam, default 24) |
+
+Alur: posting cerita → status `pending` → scheduler cek tiap 30 menit (metrik di-refresh kalau sudah basi >30 menit) → kalau tembus ambang, link ditempel sebagai self-reply → status `added`. Kalau lewat jendela tanpa tembus ambang → `expired`, link tidak dipasang lagi.
+
+Catatan: AI tetap menyisipkan link di caption, tapi saat mode aktif link itu **dibuang dari postingan utama** dan baru dipakai waktu ditempel. Kalau mau balik ke gaya lama (link langsung di bagian ke-2 thread), cukup hilangkan centang "Aktifkan mode link belakangan".
+
 ### Alur bisnis singkat
 
 ```
@@ -132,16 +158,38 @@ Login → Setting AI → Hubungkan akun (cookies/login manual) → isi Persona
 → isi Produk → atur Jadwal → scheduler generate + posting otomatis
 ```
 
-### Link Shopee: langsung vs belakangan
+### Catatan teknis Threads (penting)
 
-| Mode | Perilaku |
+- **"Add to thread" cuma ada saat bikin thread.** Setelah posting, menu `...` hanya berisi Insights, Copy link, Get embed code, Save, Pin reply, Archive, Hide like and share counts, Reply options, Delete. Jadi link belakangan memakai jalur **reply ke postingan sendiri** (self-reply), yang tidak ada batas waktunya
+- **Batas edit post**: 15 menit (5 menit di versi awal)
+- **Link tanpa kartu preview**: kartu OG dibuat async. Kode menunggu kartu muncul, menghapusnya (maks 2 percobaan), memverifikasi hilang, baru klik Post. Kalau kartu bandel, fallback: post teks saja + link di reply
+- **Ketik pakai CDP `Input.insertText`**, bukan `keyboard.type` per karakter (spasi hilang) atau set `innerText` (diabaikan React). Klik tombol pakai `Input.dispatchMouseEvent` dengan koordinat yang di-resolve ulang setelah layout geser
+- **Threads web saat ini pakai `div[data-pressable-container="true"]`**, bukan `<article>` — selector di `core/metrics.py` mengikuti itu
+
+## Jadwal internal scheduler
+
+| Tugas | Interval | Yang dikerjakan |
+|---|---|---|
+| `tick` | 5 menit | cek akun yang due (jam aktif, jeda 24/post_per_hari + jitter 5–25 menit, dedup 14 hari) → generate AI → posting |
+| `autolink_check` | 30 menit | postingan `pending` yang sudah ramai → tempel link sebagai self-reply |
+| `refresh_all` (metrik) | 3 jam | ambil views/likes/komentar/repost/share untuk maks 8 post, umur ≤14 hari |
+| `refresh_all_sessions` | 6 jam | cek sesi akun, cek yang terakhir dicek >20 jam |
+
+Semua tugas browser memakai satu `LOCK` global — posting dan scraping tidak pernah jalan bersamaan.
+
+## Data & Database
+
+| Tabel | Isi |
 |---|---|
-| Default | Link ikut di bagian ke-2 thread (`Add to thread`) saat posting, kartu preview dihapus sebelum Post |
-| Link belakangan | Cerita terbit dulu tanpa link. Scheduler cek metrik tiap 30 menit; kalau views/likes ≥ ambang, link ditempel sebagai self-reply. Lewat jendela waktu = `expired` |
+| `user` | akun login panel (single user) |
+| `social_accounts` | akun sosmed: platform, label, proxy, username asli, user-agent, status sesi, jadwal |
+| `personas` | 1 persona per akun (gaya bahasa, system prompt, contoh cerita) |
+| `products` | produk affiliate: nama, link Shopee, deskripsi, kategori, aktif |
+| `jobs` | satu baris tiap postingan: caption AI, status, `posted_at`, `screenshot_path`, `error`, `link_status`, `link_added_at` |
+| `post_metrics` | metrik per job (unik 1 baris/job): `post_url`, views, likes, replies, reposts, shares, `checked_at`, `error` |
+| `settings` | key-value: config AI + `autolink_enabled/metric/threshold/window_hours` |
 
-Batas waktu: Threads tidak menyediakan lagi tombol "Add to thread" setelah posting (menu `...` hanya berisi Insights, Copy link, Embed, Save, Pin reply, Archive, Reply options, Delete). Yang tetap bisa kapan saja adalah **self-reply** ke postingan sendiri, jadi fitur ini memakai jalur reply. Batas edit post: 15 menit (5 menit di versi awal).
-
-Atur di halaman **Statistik** → kartu "Link Otomatis Saat Ramai" (metrik pemicu, ambang, jendela jam).
+Semua kolom baru ditambahkan otomatis lewat migrasi `init_db()` saat start — aman untuk database lama.
 
 ## Struktur Project
 
@@ -155,15 +203,19 @@ omnipost/
   core/
     db.py                # koneksi + schema + settings
     ai.py                # generate_story() via OpenAI-compatible client
-    scheduler.py         # APScheduler: tick 5 mnt, jitter, dedup 14 hari
+    scheduler.py         # APScheduler: tick 5 mnt, autolink 30 mnt, dedup 14 hari
+    metrics.py           # scrape views/likes/komentar/repost/share per postingan
+    session_guard.py     # refresh sesi berkala + deteksi sesi mati
+    errorlog.py          # ID error unik, traceback, rotasi log 2 MB
     login_session.py     # browser login manual persisten (token, TTL 30 mnt)
     cookie_import.py     # parse cookies (JSON/Netscape/header) + verify
     user_agents.py       # 102 UA + penanda pemakaian per akun
     poster/
+      __init__.py        # router platform + flow Threads (CDP, hapus preview, autolink reply)
       base.py            # launch browser + fallback Chromium, storage_state
-      threads.py / instagram.py / facebook.py / twitter.py
-  templates/             # Jinja: base, login, index, akun, akun_detail,
-                         # akun_login, produk, persona, generate, jadwal, setting_ai
+      threads.py / instagram.py / facebook.py / twitter.py # poster per platform
+  templates/             # Jinja: base, login, index, akun, akun_detail, akun_login,
+                         # produk, generate, jadwal, statistik, setting_ai, logs, error
   static/
     css/app.css          # tema Vivid Pulse flat (tanpa CDN)
     fonts/               # Josefin Sans + Plus Jakarta Sans (lokal)
@@ -183,6 +235,10 @@ omnipost/
 | Generate gagal / test koneksi gagal | base URL / key / model salah | cek Setting AI → Test koneksi, pastikan model tersedia di provider |
 | Scheduler tidak posting | di luar jam aktif / belum due / produk habis kena dedup | cek Jadwal: jam aktif, kuota, tambah produk baru |
 | Browser login tidak nongol (VPS) | headless tanpa display | butuh VNC/RDP; atau pakai cara import cookies saja |
+| Metrik 0 semua / "postingan tidak ketemu" | caption postingan berbeda jauh dari data job, atau post sudah dihapus | klik **Cek** per baris; kalau post memang dihapus, angkanya akan tetap 0 |
+| Metrik tidak update | semua post baru saja dicek (<3 jam) | tunggu putaran berikutnya atau klik **Perbarui Metrik** |
+| Link tidak nempel padahal ramai | mode belum diaktifkan, metrik belum refresh, atau lewat jendela | cek kartu "Link Otomatis Saat Ramai"; status `expired` artinya lewat batas waktu |
+| Tombol Post disabled di Threads | kartu preview link masih render | kode menunggu kartu muncul, menghapusnya, lalu resolve ulang koordinat Post; kalau tetap gagal, fallback ke post teks + link di reply |
 
 ## Keamanan
 
