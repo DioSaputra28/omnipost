@@ -20,6 +20,7 @@ CREATE TABLE IF NOT EXISTS social_accounts (
     status TEXT DEFAULT 'new',
     last_post_at TEXT,
     login_token TEXT DEFAULT '',
+    username TEXT DEFAULT '',
     user_agent TEXT DEFAULT '',
     last_check_at TEXT DEFAULT '',
     check_error TEXT DEFAULT ''
@@ -67,7 +68,7 @@ def init_db():
     conn = get_conn()
     conn.executescript(SCHEMA)
     cols = [r["name"] for r in conn.execute("PRAGMA table_info(social_accounts)").fetchall()]
-    for col in ["user_agent", "last_check_at", "check_error", "login_token"]:
+    for col in ["user_agent", "last_check_at", "check_error", "login_token", "username"]:
         if col not in cols:
             conn.execute(f"ALTER TABLE social_accounts ADD COLUMN {col} TEXT DEFAULT ''")
             conn.commit()

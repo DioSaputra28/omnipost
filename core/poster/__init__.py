@@ -235,8 +235,22 @@ def post(account, caption, job_id):
             if link:
                 try:
                     page.wait_for_timeout(4000)
-                    page.goto("https://www.threads.com/@" + (account.get("label") or "").split("|")[0].strip().replace(" ", ""), timeout=60000)
-                    page.wait_for_timeout(5000)
+                    username = (account.get("username") or "").strip().lstrip("@")
+                    if not username:
+                        try:
+                            for a in page.locator('a[href^="/@"]').all()[:20]:
+                                try:
+                                    href = a.get_attribute("href") or ""
+                                    if href.startswith("/@") and len(href) > 2:
+                                        username = href[2:].split("/")[0]
+                                        break
+                                except Exception:  # noqa: BLE001
+                                    pass
+                        except Exception:  # noqa: BLE001
+                            pass
+                    if username:
+                        page.goto("https://www.threads.com/@" + username, timeout=60000)
+                        page.wait_for_timeout(5000)
                     clicked_reply = False
                     arts = page.locator("article").all()
                     for art in arts[:3]:
