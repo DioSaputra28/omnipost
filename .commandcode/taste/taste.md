@@ -2,3 +2,4 @@
 - Treats a catch-all user-facing error ("terjadi kesalahan internal") as a defect in itself: wants each failure class mapped to a specific, actionable message (bad key, missing model, quota/limit, retired model, timeout) instead of a generic one. Confidence: 0.75
 - When configuring an external AI/API endpoint, expects the app to fetch the available models from the provider's `/models` endpoint and offer them as a picker, rather than requiring the model name to be typed manually. Confidence: 0.6
 - Wants project documentation (README) kept updated to reflect every new feature/behavior change, not left stale after implementation. Confidence: 0.6
+- Prefers AI-generated content that feels like a real person, not a feed of pure advertising: expects a mix of everyday/non-promotional posts alongside promos, with the balance and voice driven by each account's persona rather than every post being a sales pitch. Confidence: 0.6
