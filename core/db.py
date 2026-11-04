@@ -106,6 +106,10 @@ def init_db():
     if "post_type" not in jcols:
         conn.execute("ALTER TABLE jobs ADD COLUMN post_type TEXT DEFAULT 'promo'")
         conn.commit()
+    for col in ["part1", "part2", "reply_bait"]:
+        if col not in jcols:
+            conn.execute(f"ALTER TABLE jobs ADD COLUMN {col} TEXT DEFAULT ''")
+            conn.commit()
     pid_col = next((r for r in jinfo if r["name"] == "product_id"), None)
     if pid_col is not None and pid_col["notnull"]:
         conn.execute("PRAGMA foreign_keys = OFF")

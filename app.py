@@ -614,15 +614,19 @@ def generate():
                 flash("akun ini belum punya persona, cerita harian butuh persona")
             else:
                 try:
-                    out = generate_daily_story(per["system_prompt"], per["gaya_bahasa"], per["contoh_cerita"])
+                    out = {"part1": generate_daily_story(per["system_prompt"], per["gaya_bahasa"],
+                                                         per["contoh_cerita"]),
+                           "part2": "", "reply_bait": ""}
                     picked_pid = 0
                 except Exception as e:  # noqa: BLE001
                     _log_error("generate/story", e)
                     flash("Gagal generate: " + _friendly(e))
         elif per and prod:
             try:
-                out = generate_story(per["system_prompt"], per["gaya_bahasa"], per["contoh_cerita"],
-                                     prod["nama"], prod["deskripsi"], prod["link_shopee"])
+                p1, p2, bait = generate_story(per["system_prompt"], per["gaya_bahasa"], per["contoh_cerita"],
+                                              prod["nama"], prod["deskripsi"], prod["link_shopee"])
+                out = {"part1": p1, "part2": p2 + ("\n" + prod["link_shopee"] if p2 else ""),
+                       "reply_bait": bait}
             except Exception as e:  # noqa: BLE001
                 _log_error("generate", e)
                 flash("Gagal generate: " + _friendly(e))

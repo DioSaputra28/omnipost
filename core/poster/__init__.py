@@ -14,7 +14,7 @@ def _debug_shot(ctx, account_id, job_id, tag):
         pass
     return path
 
-def post(account, caption, job_id, include_link=True):
+def post(account, caption, job_id, include_link=True, part1=None, part2=None, reply_bait=""):
     import re
     with sync_playwright() as p:
         browser, ctx, state_path = launch_context(p, account)
@@ -181,6 +181,16 @@ def post(account, caption, job_id, include_link=True):
                 page.wait_for_timeout(400)
                 return True
 
+            def _caret_end(idx):
+                js = ("(() => { const idx = %d;"
+                      " const els = [...document.querySelectorAll('[contenteditable=\"true\"]')];"
+                      " const e = idx < 0 ? els[els.length + idx] : els[idx];"
+                      " if (!e) return 0; e.focus();"
+                      " const r = document.createRange(); r.selectNodeContents(e); r.collapse(false);"
+                      " const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(r);"
+                      " return 1; })()") % idx
+                return _ev(js)
+
             def _add_thread_box():
                 return _ev("""(() => {
                     let best = null;
@@ -193,13 +203,18 @@ def post(account, caption, job_id, include_link=True):
                     return best;
                 })()""")
 
+            main_text = (part1 or "").strip() or text_only
+            bridge = (part2 or "").strip()
+            bait = (reply_bait or "").strip()
+            link_in_post = bool(link) and include_link
+
             _focus_editor()
             page.wait_for_timeout(400)
-            cdp.send("Input.insertText", {"text": text_only})
+            cdp.send("Input.insertText", {"text": main_text})
             page.wait_for_timeout(1200)
 
-            mode = "inline"
-            if link:
+            mode = "single"
+            if bridge or bait:
                 at = _add_thread_box()
                 if at:
                     _click(at["x"], at["y"])
@@ -207,15 +222,40 @@ def post(account, caption, job_id, include_link=True):
                 if len(_editors()) >= 2:
                     mode = "thread"
                     _click_editor(-1)
-                    cdp.send("Input.insertText", {"text": link})
+                    if bridge:
+                        cdp.send("Input.insertText", {"text": bridge})
+                        page.wait_for_timeout(1500)
+                    if bait:
+                        n = len(_editors())
+                        at2 = _add_thread_box()
+                        if at2:
+                            _click(at2["x"], at2["y"])
+                            page.wait_for_timeout(2200)
+                        if len(_editors()) > n:
+                            _click_editor(-1)
+                            cdp.send("Input.insertText", {"text": bait})
+                            page.wait_for_timeout(1500)
+                        else:
+                            _caret_end(-1)
+                            cdp.send("Input.insertText", {"text": "\n\n" + bait})
+                            page.wait_for_timeout(1200)
+                            log.info("bagian 3 gagal, bait digabung ke bagian 2")
                 else:
                     mode = "inline"
-                    cdp.send("Input.insertText", {"text": " " + link})
+                    extra = " ".join(x for x in [bridge.replace("\n", " ") if bridge else "", bait] if x)
+                    if extra:
+                        cdp.send("Input.insertText", {"text": " " + extra})
+                page.wait_for_timeout(800)
+                log.info("mode thread: %s", mode)
+
+            bridge_idx = -2 if (bait and len(_editors()) >= 3) else -1
+            if link_in_post:
+                _caret_end(bridge_idx)
+                cdp.send("Input.insertText", {"text": ("\n" + link) if mode == "thread" else (" " + link)})
                 page.wait_for_timeout(1500)
-                log.info("mode link: %s", mode)
 
             card_ok = True
-            if link:
+            if link_in_post:
                 card = None
                 for _ in range(12):
                     card = _card_box()
@@ -234,15 +274,15 @@ def post(account, caption, job_id, include_link=True):
                     card_ok = not card
 
             post_btn = _post_box()
-            link_in_post = bool(link) and card_ok
-            if link and (not card_ok or (post_btn and post_btn.get("disabled"))):
-                log.info("fallback: teks saja + link di reply")
-                _click_editor(-1)
+            if link_in_post and (not card_ok or (post_btn and post_btn.get("disabled"))):
+                log.info("fallback: buang link dari part2, link nyusul lewat reply")
+                idx = bridge_idx
+                _click_editor(idx)
                 page.keyboard.press("ControlOrMeta+a")
                 page.keyboard.press("Backspace")
                 page.wait_for_timeout(800)
-                if mode == "inline":
-                    cdp.send("Input.insertText", {"text": text_only})
+                if bridge:
+                    cdp.send("Input.insertText", {"text": bridge})
                     page.wait_for_timeout(1200)
                 link_in_post = False
 
@@ -445,10 +485,11 @@ def add_link_reply(account, post_url, link, job_id=None):
         finally:
             browser.close()
 
-def post_to_platform(account, caption, job_id, include_link=True):
+def post_to_platform(account, caption, job_id, include_link=True, part1=None, part2=None, reply_bait=""):
     plat = (account.get("platform") or "").lower()
     if plat == "threads":
-        return post(account, caption, job_id, include_link=include_link)
+        return post(account, caption, job_id, include_link=include_link,
+                    part1=part1, part2=part2, reply_bait=reply_bait)
     if plat == "instagram":
         from core.poster import instagram
         return instagram.post(account, caption, job_id)

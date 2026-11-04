@@ -11,7 +11,9 @@ Web app personal-use (single user) untuk auto-posting produk affiliate Shopee ke
 - **Detail akun** — klik Detail di tiap kartu: persona, pengaturan (label, proxy, jadwal), user-agent, riwayat 20 job, hapus akun
 - **Persona per akun** — nama, gaya bahasa, system prompt, contoh cerita (few-shot). 1 akun = 1 persona
 - **Produk affiliate** — CRUD + import CSV (`nama,link_shopee,deskripsi,kategori`)
-- **AI storytelling** — preview generate sebelum posting, protokol OpenAI-compatible (base URL + API key + model bisa diganti dari web UI di menu Setting AI, lengkap dengan tombol **Muat daftar model** dari `GET /models`)
+- **AI storytelling 3 bagian** — AI diminta balas JSON: `part1` (hook ≤40 karakter + cerita, tanpa link/produk), `part2` (bridge social proof + nama produk + satu manfaat), `reply_bait` (pertanyaan A-vs-B buat memancing balasan). **Link tidak dipegang AI** — kode yang menempel di akhir `part2`, jadi posisinya nggak mungkin salah
+- **Preview terstruktur** — halaman Generate AI menampilkan hasil per bagian (1/2, 2/2, pancingan balasan)
+- **Setting AI** — protokol OpenAI-compatible (base URL + API key + model dari web UI, ada tombol **Muat daftar model** dari `GET /models`)
 - **Campuran konten: promosi + cerita harian** — tiap akun punya **Promosi (%)**. Persentase menentukan porsi postingan jualan vs cerita keseharian (curhat/observasi, tanpa produk & link). Dijaga anti-monoton: 2 promosi beruntun dipaksa jadi cerita, 2 cerita beruntun dipaksa promosi. Kalau produk habis kena dedup, otomatis jadi cerita (kalau dipaksa promosi, dapat pesan jelas)
 - **Scheduler** — per akun: post/hari, jam aktif, cek tiap 5 menit + jitter 5–25 menit, dedup (akun+produk) 14 hari, antre 1-1 bergantian
 - **Anti-spam** — proxy per akun + 102 pilihan user-agent (tanda mana yang sudah dipakai akun lain)
@@ -132,7 +134,7 @@ Buka **Produk**: tambah manual (nama + link Shopee + deskripsi "ini produk apa" 
 
 ### 5. Generate & posting
 
-- **Generate AI**: pilih akun + **tipe konten** (Promosi produk / Cerita keseharian) lalu produk. AI bikin cerita 3–5 kalimat soft-selling (link disisip natural) atau cerita harian tanpa jualan sama sekali. Cocok → **Posting Sekarang**; kurang cocok → generate ulang
+- **Generate AI**: pilih akun + **tipe konten** (Promosi produk / Cerita keseharian) lalu produk. Untuk promosi, AI bikin 3 bagian: **part1** (hook ≤40 karakter + cerita sensorik 4–6 kalimat, tanpa produk/link), **part2** (bridge social proof + nama produk + satu manfaat), **reply_bait** (pertanyaan A-vs-B). Link ditempel kode di akhir part2. Cocok → **Posting Sekarang**; kurang cocok → generate ulang
 - **Dashboard**: post cepat manual (pilih akun, produk kosongkan = acak hindari dedup), riwayat 20 job, jadwal hari ini, performa per akun
 - **Jadwal**: antrean queued, setting per akun (post/hari, jam), kuota hari ini per akun. Scheduler otomatis: tiap akun yang due → pilih produk belum dipost 14 hari → generate AI → posting 1-1 → screenshot bukti
 
@@ -194,7 +196,7 @@ Semua tugas browser memakai satu `LOCK` global — posting dan scraping tidak pe
 | `social_accounts` | akun sosmed: platform, label, proxy, username asli, user-agent, status sesi, jadwal, `promo_ratio` |
 | `personas` | 1 persona per akun (gaya bahasa, system prompt, contoh cerita) |
 | `products` | produk affiliate: nama, link Shopee, deskripsi, kategori, aktif |
-| `jobs` | satu baris tiap postingan: `post_type` (`promo`/`story`), caption AI, status, `posted_at`, `screenshot_path`, `error`, `link_status`, `link_added_at`. `product_id` NULL untuk cerita harian |
+| `jobs` | satu baris tiap postingan: `post_type` (`promo`/`story`), `part1`, `part2`, `reply_bait`, caption gabungan, status, `posted_at`, `screenshot_path`, `error`, `link_status`, `link_added_at`. `product_id` NULL untuk cerita harian |
 | `post_metrics` | metrik per job (unik 1 baris/job): `post_url`, views, likes, replies, reposts, shares, `checked_at`, `error` |
 | `settings` | key-value: config AI (`ai_base_url`, `ai_api_key`, `ai_model`, cache `ai_models`) + `autolink_enabled/metric/threshold/window_hours` |
 
@@ -251,6 +253,8 @@ omnipost/
 | Metrik 0 semua / "postingan tidak ketemu" | caption postingan berbeda jauh dari data job, atau post sudah dihapus | klik **Cek** per baris; kalau post memang dihapus, angkanya akan tetap 0 |
 | Metrik tidak update | semua post baru saja dicek (<3 jam) | tunggu putaran berikutnya atau klik **Perbarui Metrik** |
 | Link tidak nempel padahal ramai | mode belum diaktifkan, metrik belum refresh, atau lewat jendela | cek kartu "Link Otomatis Saat Ramai"; status `expired` artinya lewat batas waktu |
+| Caption AI jadi satu blok panjang / bukan 3 bagian | model tidak balas JSON valid | kode fallback memecah per paragraf. Kalau sering, ganti model (beberapa model kecil malas format JSON) |
+| Hook part1 kepanjangan (>40 karakter) | model mengabaikan aturan hook | kode retry sekali dengan suhu lebih rendah; kalau masih panjang, dipakai apa adanya |
 | Tombol Post disabled di Threads | kartu preview link masih render | kode menunggu kartu muncul, menghapusnya, lalu resolve ulang koordinat Post; kalau tetap gagal, fallback ke post teks + link di reply |
 
 ## Keamanan

@@ -73,33 +73,48 @@ def run_job_for_account(account_id, manual_product_id=None, force_type=None):
                 ptype = "story"
 
         persona = _get_persona(account_id)
+        part1 = part2 = bait = ""
+        link_state = ""
         if ptype == "promo":
+            autolink = (get_setting("autolink_enabled", "0") or "0") == "1"
+            link_state = "pending" if autolink else "inline"
             if persona:
-                caption = generate_story(persona["system_prompt"], persona["gaya_bahasa"],
-                                         persona["contoh_cerita"], prod["nama"],
-                                         prod["deskripsi"], prod["link_shopee"])
-            else:
-                caption = f"Hari ini nemu {prod['nama']} yang bagus banget, ternyata belinya di sini {prod['link_shopee']}"
+                part1, part2, bait = generate_story(
+                    persona["system_prompt"], persona["gaya_bahasa"], persona["contoh_cerita"],
+                    prod["nama"], prod["deskripsi"], prod["link_shopee"])
+            if not part1:
+                part1 = f"Hari ini nemu {prod['nama']} yang bagus banget."
+                part2 = f"Ternyata belinya di sini."
+                bait = ""
+            joined = part1
+            if part2:
+                joined += "\n\n" + part2
+            if not autolink:
+                joined += "\n" + prod["link_shopee"]
+            caption = joined
         else:
+            link_state = "none"
             if persona:
                 caption = generate_daily_story(persona["system_prompt"], persona["gaya_bahasa"],
                                                persona["contoh_cerita"])
             else:
                 caption = "Lagi pengen cerita random aja hari ini. Kalian gimana, hari ini berjalan lancar?"
+            part1 = caption
 
         conn = get_conn()
         cur = conn.execute(
-            "INSERT INTO jobs (account_id, product_id, caption_hasil_ai, status, scheduled_at, post_type) "
-            "VALUES (?,?,?, 'queued', ?, ?)",
-            (account_id, (prod["id"] if prod else None), caption, datetime.now().isoformat(), ptype))
+            "INSERT INTO jobs (account_id, product_id, caption_hasil_ai, status, scheduled_at, post_type, "
+            "part1, part2, reply_bait, link_status) VALUES (?,?,?, 'queued', ?, ?, ?, ?, ?, ?)",
+            (account_id, (prod["id"] if prod else None), caption, datetime.now().isoformat(), ptype,
+             part1, part2, bait, link_state))
         job_id = cur.lastrowid
         conn.commit()
         conn.close()
 
-        autolink = (get_setting("autolink_enabled", "0") or "0") == "1" and ptype == "promo"
-        link_state = ("pending" if autolink else "inline") if ptype == "promo" else "none"
         try:
-            shot = post_to_platform(dict(acc), caption, job_id, include_link=ptype == "promo" and not autolink)
+            shot = post_to_platform(dict(acc), caption, job_id,
+                                    include_link=link_state == "inline",
+                                    part1=part1, part2=part2, reply_bait=bait)
             conn = get_conn()
             conn.execute("UPDATE jobs SET status='posted', posted_at=?, screenshot_path=?, link_status=? WHERE id = ?",
                          (datetime.now().isoformat(), shot, link_state, job_id))

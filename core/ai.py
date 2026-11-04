@@ -57,30 +57,102 @@ Gaya bahasa: {gaya}
 Contoh cerita (tirukan gayanya, jangan copy):
 {contoh}
 
-Produk yang mau diselipin:
+Produk:
 - Nama: {nama}
 - Deskripsi: {deskripsi}
-- Link: {link}
 
-Aturan:
-- Cerita 3-5 kalimat, natural kayak postingan orang biasa, soft-selling, JANGAN kayak iklan.
-- Sisipkan link secara natural di tengah cerita (misal: "aku tanya penjualnya... ternyata pake {link}").
-- Wajib ada link-nya tepat 1x. Bahasa Indonesia santai.
+Balas HANYA dengan JSON valid, tanpa markdown:
+{{"part1": "...", "part2": "...", "reply_bait": "..."}}
+
+ATURAN part1 (cerita, TANPA link, TANPA produk):
+- Baris pertama = hook, MAKSIMAL 40 karakter, bikin orang pengen buka "lihat selengkapnya"
+- Total 4-6 kalimat, ada detail sensorik konkret (bau, suhu, bunyi, tekstur)
+- Detail WAJIB logis dengan setting cerita
+- Jangan pakai "dia" kalau belum disebut siapa
+- DILARANG: link, nama produk, harga, angka rupiah
+
+ATURAN part2 (bridge + FAB):
+- Kalimat 1: social proof nyambung dari part1 (contoh: "yang tadi nanya ...")
+- Kalimat 2: nama produk + SATU manfaat konkret
+- DILARANG menyebut harga, nominal, diskon, atau kata promo
+- DILARANG frasa: "pake produk ini", "wajib punya", "buruan", "murah"
+
+ATURAN reply_bait:
+- Isi pertanyaan A-vs-B yang bikin orang jawab, contoh "kamu tim X apa tim Y?"
+- DILARANG pertanyaan mati seperti "menurut kalian gimana?"
+- Kalau tidak perlu, isi string kosong ""
 """
 
-def generate_story(system_prompt, gaya, contoh, nama, deskripsi, link):
+
+def _parse_parts(raw):
+    import json as _json
+    import re as _re
+    text = (raw or "").strip()
+    if text.startswith("```"):
+        text = _re.sub(r"^```[a-zA-Z]*\s*", "", text)
+        text = _re.sub(r"\s*```$", "", text).strip()
+    data = None
+    try:
+        data = _json.loads(text)
+    except ValueError:
+        i, j = text.find("{"), text.rfind("}")
+        if i >= 0 and j > i:
+            try:
+                data = _json.loads(text[i:j + 1])
+            except ValueError:
+                data = None
+    if isinstance(data, dict):
+        part1 = str(data.get("part1") or "").strip()
+        part2 = str(data.get("part2") or "").strip()
+        bait = str(data.get("reply_bait") or "").strip()
+        if bait.lower() in ('""', "''", "-", "tidak", "none", "null"):
+            bait = ""
+        if part1:
+            return part1, part2, bait
+    blocks = [b.strip() for b in (raw or "").split("\n\n") if b.strip()]
+    part1 = blocks[0] if blocks else (raw or "").strip()
+    part2 = blocks[1] if len(blocks) > 1 else ""
+    return part1, part2, ""
+
+
+def _hook_too_long(part1, limit=40):
+    first = (part1.split("\n")[0] or "").strip()
+    return len(first) > limit
+
+
+def generate_story(system_prompt, gaya, contoh, nama, deskripsi, link=None):
+    import logging
     _, _, model = _cfg()
     client = _client()
     user_msg = PROMPT_TEMPLATE.format(system_prompt=system_prompt, gaya=gaya or "-",
                                       contoh=contoh or "-", nama=nama,
-                                      deskripsi=deskripsi or "-", link=link)
-    resp = client.chat.completions.create(
-        model=model,
-        messages=[{"role": "user", "content": user_msg}],
-        temperature=0.9,
-        max_tokens=300,
-    )
-    return resp.choices[0].message.content.strip()
+                                      deskripsi=deskripsi or "-")
+    best = None
+    for attempt in range(2):
+        msgs = [{"role": "user", "content": user_msg}]
+        if attempt == 1:
+            msgs.append({"role": "assistant", "content": '{"part1": "'})
+            msgs.append({"role": "user", "content":
+                         "Inget: baris pertama part1 adalah HOOK, MAKSIMAL 40 karakter, "
+                         "lalu newline \\n sebelum kalimat berikutnya. Ulangi JSON-nya."})
+        resp = client.chat.completions.create(
+            model=model,
+            messages=msgs,
+            temperature=0.9 if attempt == 0 else 0.6,
+            max_tokens=1500,
+        )
+        part1, part2, bait = _parse_parts(resp.choices[0].message.content or "")
+        if part1 and part2:
+            best = (part1, part2, bait)
+            if not _hook_too_long(part1):
+                return best
+        elif part1 and not best:
+            best = (part1, part2, bait)
+    if best is None:
+        return "", "", ""
+    if _hook_too_long(best[0]):
+        logging.getLogger("omnipost").info("generate_story: hook masih >40 karakter setelah retry")
+    return best
 
 
 DAILY_TOPICS = [
@@ -135,6 +207,6 @@ def generate_daily_story(system_prompt, gaya, contoh, topik=None):
         model=model,
         messages=[{"role": "user", "content": user_msg}],
         temperature=0.95,
-        max_tokens=400,
+        max_tokens=800,
     )
     return resp.choices[0].message.content.strip()
