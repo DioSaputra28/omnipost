@@ -47,8 +47,8 @@
 <div class="card">
 <h2>{{ icon('queue-list') }} Riwayat Postingan</h2>
 <p class="sub">20 job terakhir akun ini.</p>
-<table class="tbl"><tr><th>ID</th><th>Produk</th><th>Status</th><th>Caption</th></tr>
-{% for j in jobs %}<tr><td>{{j.id}}</td><td>{{j.nama}}</td><td>{% if j.status=='posted' %}<span class="pill pill-ok">Terbit</span>{% elif j.status=='failed' %}<span class="pill pill-err">Gagal</span>{% else %}<span class="pill pill-mut">{{j.status}}</span>{% endif %}</td><td><div class="clip">{{j.caption_hasil_ai}}</div></td></tr>{% else %}<tr><td colspan="4">Belum ada.</td></tr>{% endfor %}
+<table class="tbl"><tr><th>ID</th><th>Tipe</th><th>Produk</th><th>Status</th><th>Caption</th></tr>
+{% for j in jobs %}<tr><td>{{j.id}}</td><td>{% if j.post_type == 'story' %}<span class="pill pill-mut">Cerita</span>{% else %}<span class="pill pill-pri">Promosi</span>{% endif %}</td><td>{{j.nama}}</td><td>{% if j.status=='posted' %}<span class="pill pill-ok">Terbit</span>{% elif j.status=='failed' %}<span class="pill pill-err">Gagal</span>{% else %}<span class="pill pill-mut">{{j.status}}</span>{% endif %}</td><td><div class="clip">{{j.caption_hasil_ai}}</div></td></tr>{% else %}<tr><td colspan="5">Belum ada.</td></tr>{% endfor %}
 </table>
 </div>
 </div>
@@ -71,6 +71,7 @@
 <div><label class="lb">Post/hari</label><input class="in" name="posts_per_day" type="number" value="{{acc.posts_per_day}}"/></div>
 <div><label class="lb">Jam mulai</label><input class="in" name="hour_start" type="number" value="{{acc.active_hour_start}}"/></div>
 <div><label class="lb">Jam selesai</label><input class="in" name="hour_end" type="number" value="{{acc.active_hour_end}}"/></div>
+<div><label class="lb">Promosi (%)</label><input class="in" name="promo_ratio" type="number" min="0" max="100" value="{{acc.promo_ratio if acc.promo_ratio is not none else 70}}"/></div>
 </div>
 <button class="btn btn-pri" style="width:auto">Simpan Pengaturan</button>
 </form>

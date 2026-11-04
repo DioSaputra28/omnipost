@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 from apscheduler.schedulers.background import BackgroundScheduler
 
 from core.db import get_conn, get_setting
-from core.ai import generate_story
+from core.ai import generate_story, generate_daily_story
 from core.poster import post_to_platform, add_link_reply
 
 LOCK = threading.Lock()
@@ -24,13 +24,30 @@ def _pick_product(account_id):
     conn.close()
     return rows
 
+def _pick_post_type(acc):
+    try:
+        ratio = max(0, min(100, int(acc["promo_ratio"] if "promo_ratio" in acc.keys() else 70)))
+    except (TypeError, ValueError):
+        ratio = 70
+    conn = get_conn()
+    rows = conn.execute(
+        "SELECT post_type FROM jobs WHERE account_id=? AND status='posted' ORDER BY id DESC LIMIT 2",
+        (acc["id"],)).fetchall()
+    conn.close()
+    types = [(r["post_type"] or "promo") for r in rows]
+    if len(types) == 2 and types[0] == types[1] == "promo":
+        return "story"
+    if len(types) == 2 and types[0] == types[1] == "story":
+        return "promo"
+    return "promo" if random.randint(1, 100) <= ratio else "story"
+
 def _get_persona(account_id):
     conn = get_conn()
     row = conn.execute("SELECT * FROM personas WHERE account_id = ? LIMIT 1", (account_id,)).fetchone()
     conn.close()
     return row
 
-def run_job_for_account(account_id, manual_product_id=None):
+def run_job_for_account(account_id, manual_product_id=None, force_type=None):
     with LOCK:
         conn = get_conn()
         acc = conn.execute("SELECT * FROM social_accounts WHERE id = ?", (account_id,)).fetchone()
@@ -38,38 +55,54 @@ def run_job_for_account(account_id, manual_product_id=None):
         if not acc:
             return None, "akun tidak ketemu"
 
+        ptype = force_type if force_type in ("promo", "story") else _pick_post_type(acc)
+        if ptype == "story" and manual_product_id:
+            ptype = "promo"
+
         prod = None
-        if manual_product_id:
-            conn = get_conn()
-            prod = conn.execute("SELECT * FROM products WHERE id = ?", (manual_product_id,)).fetchone()
-            conn.close()
-        else:
-            prod = _pick_product(account_id)
-        if not prod:
-            return None, "tidak ada produk tersedia (habis / kena dedup 14 hari)"
+        if ptype == "promo":
+            if manual_product_id:
+                conn = get_conn()
+                prod = conn.execute("SELECT * FROM products WHERE id = ?", (manual_product_id,)).fetchone()
+                conn.close()
+            else:
+                prod = _pick_product(account_id)
+            if not prod:
+                if force_type == "promo":
+                    return None, "tidak ada produk tersedia (habis / kena dedup 14 hari)"
+                ptype = "story"
 
         persona = _get_persona(account_id)
-        if persona:
-            caption = generate_story(persona["system_prompt"], persona["gaya_bahasa"],
-                                     persona["contoh_cerita"], prod["nama"],
-                                     prod["deskripsi"], prod["link_shopee"])
+        if ptype == "promo":
+            if persona:
+                caption = generate_story(persona["system_prompt"], persona["gaya_bahasa"],
+                                         persona["contoh_cerita"], prod["nama"],
+                                         prod["deskripsi"], prod["link_shopee"])
+            else:
+                caption = f"Hari ini nemu {prod['nama']} yang bagus banget, ternyata belinya di sini {prod['link_shopee']}"
         else:
-            caption = f"Hari ini nemu {prod['nama']} yang bagus banget, ternyata belinya di sini {prod['link_shopee']}"
+            if persona:
+                caption = generate_daily_story(persona["system_prompt"], persona["gaya_bahasa"],
+                                               persona["contoh_cerita"])
+            else:
+                caption = "Lagi pengen cerita random aja hari ini. Kalian gimana, hari ini berjalan lancar?"
 
         conn = get_conn()
         cur = conn.execute(
-            "INSERT INTO jobs (account_id, product_id, caption_hasil_ai, status, scheduled_at) VALUES (?,?,?, 'queued', ?)",
-            (account_id, prod["id"], caption, datetime.now().isoformat()))
+            "INSERT INTO jobs (account_id, product_id, caption_hasil_ai, status, scheduled_at, post_type) "
+            "VALUES (?,?,?, 'queued', ?, ?)",
+            (account_id, (prod["id"] if prod else None), caption, datetime.now().isoformat(), ptype))
         job_id = cur.lastrowid
         conn.commit()
         conn.close()
 
-        autolink = (get_setting("autolink_enabled", "0") or "0") == "1"
+        autolink = (get_setting("autolink_enabled", "0") or "0") == "1" and ptype == "promo"
+        link_state = ("pending" if autolink else "inline") if ptype == "promo" else "none"
         try:
-            shot = post_to_platform(dict(acc), caption, job_id, include_link=not autolink)
+            shot = post_to_platform(dict(acc), caption, job_id, include_link=ptype == "promo" and not autolink)
             conn = get_conn()
             conn.execute("UPDATE jobs SET status='posted', posted_at=?, screenshot_path=?, link_status=? WHERE id = ?",
-                         (datetime.now().isoformat(), shot, "pending" if autolink else "inline", job_id))
+                         (datetime.now().isoformat(), shot, link_state, job_id))
             conn.execute("UPDATE social_accounts SET last_post_at=?, status='ok' WHERE id = ?",
                          (datetime.now().isoformat(), account_id))
             conn.commit()
@@ -137,7 +170,7 @@ def autolink_check():
     conn = get_conn()
     rows = conn.execute(
         """SELECT j.id, j.account_id, j.posted_at, p.link_shopee, m.post_url, m.views, m.likes, m.checked_at
-           FROM jobs j JOIN products p ON p.id = j.product_id
+           FROM jobs j LEFT JOIN products p ON p.id = j.product_id
            LEFT JOIN post_metrics m ON m.job_id = j.id
            WHERE j.status = 'posted' AND j.link_status = 'pending'""").fetchall()
     conn.close()
@@ -153,7 +186,7 @@ def autolink_check():
         conn = get_conn()
         rows = conn.execute(
             """SELECT j.id, j.account_id, j.posted_at, p.link_shopee, m.post_url, m.views, m.likes, m.checked_at
-               FROM jobs j JOIN products p ON p.id = j.product_id
+               FROM jobs j LEFT JOIN products p ON p.id = j.product_id
                LEFT JOIN post_metrics m ON m.job_id = j.id
                WHERE j.status = 'posted' AND j.link_status = 'pending'""").fetchall()
         conn.close()

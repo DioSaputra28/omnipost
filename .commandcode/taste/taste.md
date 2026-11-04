@@ -1,2 +1,4 @@
 - Prefers graceful error handling: never expose raw 500/stack traces to end users; show a friendly message and keep detailed diagnosable internal logs (error ID, request context, traceback). Confidence: 0.85
+- Treats a catch-all user-facing error ("terjadi kesalahan internal") as a defect in itself: wants each failure class mapped to a specific, actionable message (bad key, missing model, quota/limit, retired model, timeout) instead of a generic one. Confidence: 0.75
+- When configuring an external AI/API endpoint, expects the app to fetch the available models from the provider's `/models` endpoint and offer them as a picker, rather than requiring the model name to be typed manually. Confidence: 0.6
 - Wants project documentation (README) kept updated to reflect every new feature/behavior change, not left stale after implementation. Confidence: 0.6

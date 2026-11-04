@@ -90,6 +90,7 @@
 {% elif r.link_status == 'pending' %}<span class="pill pill-pri">nunggu ramai</span>
 {% elif r.link_status == 'expired' %}<span class="pill pill-mut">hangus</span>
 {% elif r.link_status == 'inline' %}<span class="pill pill-ok">sejak awal</span>
+{% elif r.post_type == 'story' %}<span class="pill pill-mut">cerita</span>
 {% else %}<span class="pill pill-mut">-</span>{% endif %}
 </td>
 {% if r.checked_at %}

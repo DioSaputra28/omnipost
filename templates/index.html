@@ -66,7 +66,7 @@
 <p class="sub">{{today}}</p>
 {% for j in today_jobs %}<div class="job" style="margin-bottom:12px">
 <div class="jb"><div class="job-time">{{j.scheduled_at or "-"}} - {{j.nama}}</div>
-<div style="font-size:12px;color:var(--onvar)">{{j.label}} ({{j.platform}}) - <span class="shop-link">{{j.link_shopee[:60]}}</span></div></div>
+<div style="font-size:12px;color:var(--onvar)">{{j.label}} ({{j.platform}}) - <span class="shop-link">{{ (j.link_shopee or 'cerita harian, tanpa link')[:60] }}</span></div></div>
 <div>{% if j.status=='posted' %}<span class="pill pill-ok">Siap Terbit</span>{% elif j.status=='failed' %}<span class="pill pill-err">Gagal</span>{% else %}<span class="pill pill-pri">Antrean</span>{% endif %}</div>
 </div>{% else %}<p class="sub">Belum ada jadwal hari ini. Atur di halaman Jadwal.</p>{% endfor %}
 <a class="btn btn-ghost" href="/jadwal">Lihat Seluruh Kalender</a>

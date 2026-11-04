@@ -1,4 +1,5 @@
 import os
+import random
 from openai import OpenAI
 
 def _cfg():
@@ -78,5 +79,62 @@ def generate_story(system_prompt, gaya, contoh, nama, deskripsi, link):
         messages=[{"role": "user", "content": user_msg}],
         temperature=0.9,
         max_tokens=300,
+    )
+    return resp.choices[0].message.content.strip()
+
+
+DAILY_TOPICS = [
+    "pagi hari yang riweuh sebelum berangkat kerja",
+    "hujan tiba-tiba pas lagi di jalan",
+    "makanan warung pinggir jalan yang bikin nagih",
+    "antre panjang di minimarket",
+    "drama kecil di grup chat keluarga",
+    "keingetan mantan gara-gara lagu di radio",
+    "kerjaan numpuk tapi pengen rebahan",
+    "belanja online yang ternyata nggak sesuai foto",
+    "tetangga yang suka banget nanya urusan orang",
+    "malam minggu yang ternyata cuma di rumah",
+    "kopi pagi yang rasanya beda kalau lagi males",
+    "niat olahraga tapi batal di tengah jalan",
+    "obrolan random sama tukang parkir",
+    "cuaca panas yang bikin emosi naik",
+    "nemu uang di kantong jaket lama",
+    "lihat kucing liar yang gemesin",
+    "nonton film yang endingnya bikin kesel",
+    "gagal move on dari serial lama",
+    "resign mental tiap hari Senin",
+    "memikirkan harga barang yang makin naik",
+    "trauma masa kecil yang tiba-tiba keinget",
+    "rencana liburan yang cuma jadi wacana",
+    "masak sendiri dan hasilnya nggak sesuai ekspektasi",
+    "dengerin musik lama sambil mellow",
+]
+
+DAILY_TEMPLATE = """{system_prompt}
+
+Gaya bahasa: {gaya}
+Contoh cerita (tirukan gayanya, jangan copy):
+{contoh}
+
+Tulis satu postingan Threads tentang: {topik}
+
+Aturan:
+- 2-4 kalimat, natural kayak orang curhat atau observasi kecil, bukan jualan.
+- JANGAN sebut produk, harga, brand, atau link apa pun.
+- Boleh diakhiri pertanyaan ringan atau ajakan ngobrol biar orang balas.
+- Bahasa Indonesia santai, sesuai gaya di atas.
+"""
+
+def generate_daily_story(system_prompt, gaya, contoh, topik=None):
+    _, _, model = _cfg()
+    client = _client()
+    topik = topik or random.choice(DAILY_TOPICS)
+    user_msg = DAILY_TEMPLATE.format(system_prompt=system_prompt, gaya=gaya or "-",
+                                     contoh=contoh or "-", topik=topik)
+    resp = client.chat.completions.create(
+        model=model,
+        messages=[{"role": "user", "content": user_msg}],
+        temperature=0.95,
+        max_tokens=400,
     )
     return resp.choices[0].message.content.strip()

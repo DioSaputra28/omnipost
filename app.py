@@ -14,7 +14,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.exceptions import HTTPException, NotFound
 
 from core.db import get_conn, init_db, get_setting, set_setting
-from core.ai import generate_story, _cfg
+from core.ai import generate_story, generate_daily_story, _cfg
 from core.scheduler import start_scheduler, run_job_for_account
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -202,16 +202,16 @@ def index():
     rate = round(stats["posted"] / total * 100, 1) if total else 0
     queued = conn.execute("SELECT COUNT(*) c FROM jobs WHERE status='queued'").fetchone()["c"]
     jobs = conn.execute(
-        "SELECT j.*, s.label, s.platform, p.nama FROM jobs j "
+        "SELECT j.*, s.label, s.platform, COALESCE(p.nama, '— cerita harian —') AS nama FROM jobs j "
         "JOIN social_accounts s ON s.id=j.account_id "
-        "JOIN products p ON p.id=j.product_id ORDER BY j.id DESC LIMIT 20").fetchall()
+        "LEFT JOIN products p ON p.id=j.product_id ORDER BY j.id DESC LIMIT 20").fetchall()
     accs = conn.execute("SELECT * FROM social_accounts").fetchall()
     prods = conn.execute("SELECT * FROM products WHERE aktif=1").fetchall()
     today = datetime.now().strftime("%A, %d %B %Y")
     today_jobs = conn.execute(
-        "SELECT j.*, s.label, s.platform, p.nama, p.link_shopee FROM jobs j "
+        "SELECT j.*, s.label, s.platform, COALESCE(p.nama, '— cerita harian —') AS nama, p.link_shopee FROM jobs j "
         "JOIN social_accounts s ON s.id=j.account_id "
-        "JOIN products p ON p.id=j.product_id "
+        "LEFT JOIN products p ON p.id=j.product_id "
         "WHERE date(j.scheduled_at)=date('now','localtime') ORDER BY j.id DESC LIMIT 10").fetchall()
     perf = conn.execute(
         "SELECT s.label, s.platform, "
@@ -459,7 +459,8 @@ def akun_detail(aid):
         return redirect(url_for("akun"))
     persona = conn.execute("SELECT * FROM personas WHERE account_id=? LIMIT 1", (aid,)).fetchone()
     jobs = conn.execute(
-        "SELECT j.*, p.nama FROM jobs j JOIN products p ON p.id=j.product_id "
+        "SELECT j.*, COALESCE(p.nama, '— cerita harian —') AS nama FROM jobs j "
+        "LEFT JOIN products p ON p.id=j.product_id "
         "WHERE j.account_id=? ORDER BY j.id DESC LIMIT 20", (aid,)).fetchall()
     posted = conn.execute("SELECT COUNT(*) c FROM jobs WHERE account_id=? AND status='posted'", (aid,)).fetchone()["c"]
     failed = conn.execute("SELECT COUNT(*) c FROM jobs WHERE account_id=? AND status='failed'", (aid,)).fetchone()["c"]
@@ -474,13 +475,15 @@ def akun_detail(aid):
 def akun_simpan(aid):
     conn = get_conn()
     conn.execute(
-        "UPDATE social_accounts SET label=?, proxy=?, user_agent=?, posts_per_day=?, active_hour_start=?, active_hour_end=? WHERE id=?",
+        "UPDATE social_accounts SET label=?, proxy=?, user_agent=?, posts_per_day=?, active_hour_start=?, "
+        "active_hour_end=?, promo_ratio=? WHERE id=?",
         (request.form.get("label", "").strip(),
          request.form.get("proxy", "").strip(),
          request.form.get("user_agent", "").strip(),
          int(request.form.get("posts_per_day", 3) or 3),
          int(request.form.get("hour_start", 7) or 7),
          int(request.form.get("hour_end", 21) or 21),
+         max(0, min(100, int(request.form.get("promo_ratio", 70) or 70))),
          aid))
     conn.commit()
     conn.close()
@@ -593,8 +596,10 @@ def generate():
     prods = conn.execute("SELECT * FROM products WHERE aktif=1").fetchall()
     conn.close()
     if request.method == "POST":
+        tipe = request.form.get("tipe") or "promo"
         try:
-            aid, pid = int(request.form.get("account_id", 0)), int(request.form.get("product_id", 0))
+            aid = int(request.form.get("account_id", 0))
+            pid = int(request.form.get("product_id", 0) or 0)
         except (TypeError, ValueError):
             flash("pilih akun dan produk yang valid")
             return render_template("generate.html", accs=accs, prods=prods, out=None,
@@ -602,9 +607,19 @@ def generate():
         picked_aid, picked_pid = aid, pid
         conn = get_conn()
         per = conn.execute("SELECT * FROM personas WHERE account_id=? LIMIT 1", (aid,)).fetchone()
-        prod = conn.execute("SELECT * FROM products WHERE id=?", (pid,)).fetchone()
+        prod = conn.execute("SELECT * FROM products WHERE id=?", (pid,)).fetchone() if pid else None
         conn.close()
-        if per and prod:
+        if tipe == "story":
+            if not per:
+                flash("akun ini belum punya persona, cerita harian butuh persona")
+            else:
+                try:
+                    out = generate_daily_story(per["system_prompt"], per["gaya_bahasa"], per["contoh_cerita"])
+                    picked_pid = 0
+                except Exception as e:  # noqa: BLE001
+                    _log_error("generate/story", e)
+                    flash("Gagal generate: " + _friendly(e))
+        elif per and prod:
             try:
                 out = generate_story(per["system_prompt"], per["gaya_bahasa"], per["contoh_cerita"],
                                      prod["nama"], prod["deskripsi"], prod["link_shopee"])
@@ -614,7 +629,9 @@ def generate():
         else:
             flash("akun ini belum punya persona / produk tidak ketemu")
     return render_template("generate.html", accs=accs, prods=prods, out=out,
-                           picked_aid=picked_aid, picked_pid=picked_pid, nav="gen")
+                           picked_aid=picked_aid, picked_pid=picked_pid,
+                           picked_tipe=(request.form.get("tipe") if request.method == "POST" else None),
+                           nav="gen")
 
 @app.route("/post-now", methods=["POST"])
 @login_required
@@ -630,8 +647,11 @@ def post_now():
     except (TypeError, ValueError):
         flash("product_id tidak valid")
         return redirect(url_for("index"))
+    ptype = request.form.get("post_type") or None
+    if ptype not in ("promo", "story"):
+        ptype = None
     try:
-        jid, err = run_job_for_account(aid, pid)
+        jid, err = run_job_for_account(aid, pid, force_type=ptype)
     except Exception as e:  # noqa: BLE001
         _log_error("post-now", e)
         flash("Gagal posting: " + _friendly(e))
@@ -703,9 +723,9 @@ def jadwal():
     conn = get_conn()
     rows = conn.execute("SELECT * FROM social_accounts").fetchall()
     queued = conn.execute(
-        "SELECT j.*, s.label, s.platform, p.nama, p.link_shopee FROM jobs j "
+        "SELECT j.*, s.label, s.platform, COALESCE(p.nama, '— cerita harian —') AS nama, p.link_shopee FROM jobs j "
         "JOIN social_accounts s ON s.id=j.account_id "
-        "JOIN products p ON p.id=j.product_id "
+        "LEFT JOIN products p ON p.id=j.product_id "
         "WHERE j.status='queued' ORDER BY j.id DESC LIMIT 30").fetchall()
     drafts = []
     posted_month = conn.execute("SELECT COUNT(*) c FROM jobs WHERE status='posted' AND scheduled_at IS NOT NULL").fetchone()["c"]
@@ -751,10 +771,11 @@ def jadwal_save(aid):
 def statistik():
     conn = get_conn()
     rows = conn.execute(
-        "SELECT j.id, j.posted_at, j.caption_hasil_ai, j.link_status, j.link_added_at, s.label, s.platform, p.nama, "
+        "SELECT j.id, j.posted_at, j.caption_hasil_ai, j.link_status, j.link_added_at, j.post_type, s.label, s.platform, "
+        "COALESCE(p.nama, '— cerita harian —') AS nama, "
         "m.views, m.likes, m.replies, m.reposts, m.shares, m.checked_at, m.error, m.post_url "
         "FROM jobs j JOIN social_accounts s ON s.id=j.account_id "
-        "JOIN products p ON p.id=j.product_id "
+        "LEFT JOIN products p ON p.id=j.product_id "
         "LEFT JOIN post_metrics m ON m.job_id=j.id "
         "WHERE j.status='posted' ORDER BY j.posted_at DESC LIMIT 60").fetchall()
     total = conn.execute(

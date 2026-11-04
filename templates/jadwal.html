@@ -25,7 +25,7 @@
 <div class="jb">
 <div class="job-time">{{(j.scheduled_at or "")[:16]}} - {{j.nama}}</div>
 <p style="margin:8px 0;font-size:13px">{{j.caption_hasil_ai[:220]}}</p>
-<div style="font-size:12px;color:var(--outline)">Target: <strong style="color:var(--on)">{{j.label}}</strong> ({{j.platform}}) - <span class="shop-link">{{j.link_shopee[:60]}}</span></div>
+<div style="font-size:12px;color:var(--outline)">Target: <strong style="color:var(--on)">{{j.label}}</strong> ({{j.platform}}) - <span class="shop-link">{{ (j.link_shopee or 'cerita harian, tanpa link')[:60] }}</span></div>
 </div>
 <div><span class="pill pill-pri">Antrean</span></div>
 </div>

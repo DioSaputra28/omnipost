@@ -7,11 +7,17 @@
 <div class="grid2">
 <div class="card">
 <h2>{{ icon('sparkles') }} Buat Draft dan Publikasi Cepat</h2>
-<p class="sub">Pilih akun (persona ikut akun) dan produk, AI bikin cerita soft-selling.</p>
+<p class="sub">Pilih akun (persona ikut akun), lalu tipe kontennya: promosi produk atau cerita keseharian tanpa jualan.</p>
 <form class="f" method="post">
 <label class="lb">Akun target</label><select class="in" name="account_id">{% for a in accs %}<option value="{{a.id}}">{{a.label}} ({{a.platform}})</option>{% endfor %}</select>
-<label class="lb">Produk</label><select class="in" name="product_id">{% for p in prods %}<option value="{{p.id}}">{{p.nama}}</option>{% endfor %}</select>
-<button class="btn btn-pri">Generate Cerita</button>
+<label class="lb">Tipe konten</label>
+<select class="in" name="tipe">
+<option value="promo" {% if picked_tipe != 'story' %}selected{% endif %}>Promosi produk (pakai link)</option>
+<option value="story" {% if picked_tipe == 'story' %}selected{% endif %}>Cerita keseharian (tanpa produk)</option>
+</select>
+<label class="lb">Produk (diabaikan kalau pilih cerita keseharian)</label>
+<select class="in" name="product_id">{% for p in prods %}<option value="{{p.id}}">{{p.nama}}</option>{% endfor %}</select>
+<button class="btn btn-pri">Generate</button>
 </form>
 </div>
 <div class="card">
@@ -21,6 +27,7 @@
 <form class="f" method="post" action="/post-now" style="margin-top:12px">
 <input type="hidden" name="account_id" value="{{picked_aid}}"/>
 <input type="hidden" name="product_id" value="{{picked_pid}}"/>
+<input type="hidden" name="post_type" value="{{picked_tipe or 'promo'}}"/>
 <button class="btn btn-pri" style="width:auto">Posting Cerita Ini Sekarang</button>
 </form>
 {% else %}<p class="sub">Belum ada hasil. Generate dulu.</p>{% endif %}

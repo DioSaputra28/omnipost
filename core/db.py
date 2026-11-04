@@ -44,13 +44,16 @@ CREATE TABLE IF NOT EXISTS products (
 CREATE TABLE IF NOT EXISTS jobs (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     account_id INTEGER NOT NULL REFERENCES social_accounts(id) ON DELETE CASCADE,
-    product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+    product_id INTEGER REFERENCES products(id) ON DELETE SET NULL,
     caption_hasil_ai TEXT DEFAULT '',
     status TEXT DEFAULT 'queued',
     scheduled_at TEXT,
     posted_at TEXT,
     screenshot_path TEXT,
-    error TEXT
+    error TEXT,
+    post_type TEXT DEFAULT 'promo',
+    link_status TEXT DEFAULT '',
+    link_added_at TEXT DEFAULT ''
 );
 CREATE TABLE IF NOT EXISTS settings (
     key TEXT PRIMARY KEY,
@@ -91,11 +94,47 @@ def init_db():
     conn.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('autolink_metric', 'views')")
     conn.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('autolink_threshold', '100')")
     conn.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('autolink_window_hours', '24')")
-    jcols = [r["name"] for r in conn.execute("PRAGMA table_info(jobs)").fetchall()]
+    if "promo_ratio" not in cols:
+        conn.execute("ALTER TABLE social_accounts ADD COLUMN promo_ratio INTEGER DEFAULT 70")
+        conn.commit()
+    jinfo = conn.execute("PRAGMA table_info(jobs)").fetchall()
+    jcols = [r["name"] for r in jinfo]
     for col in ["link_status", "link_added_at"]:
         if col not in jcols:
             conn.execute(f"ALTER TABLE jobs ADD COLUMN {col} TEXT DEFAULT ''")
             conn.commit()
+    if "post_type" not in jcols:
+        conn.execute("ALTER TABLE jobs ADD COLUMN post_type TEXT DEFAULT 'promo'")
+        conn.commit()
+    pid_col = next((r for r in jinfo if r["name"] == "product_id"), None)
+    if pid_col is not None and pid_col["notnull"]:
+        conn.execute("PRAGMA foreign_keys = OFF")
+        conn.executescript("""
+            CREATE TABLE jobs_new (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                account_id INTEGER NOT NULL REFERENCES social_accounts(id) ON DELETE CASCADE,
+                product_id INTEGER REFERENCES products(id) ON DELETE SET NULL,
+                caption_hasil_ai TEXT DEFAULT '',
+                status TEXT DEFAULT 'queued',
+                scheduled_at TEXT,
+                posted_at TEXT,
+                screenshot_path TEXT,
+                error TEXT,
+                post_type TEXT DEFAULT 'promo',
+                link_status TEXT DEFAULT '',
+                link_added_at TEXT DEFAULT ''
+            );
+            INSERT INTO jobs_new (id, account_id, product_id, caption_hasil_ai, status, scheduled_at,
+                                  posted_at, screenshot_path, error, post_type, link_status, link_added_at)
+                SELECT id, account_id, product_id, caption_hasil_ai, status, scheduled_at,
+                       posted_at, screenshot_path, error,
+                       COALESCE(post_type, 'promo'), COALESCE(link_status, ''), COALESCE(link_added_at, '')
+                FROM jobs;
+            DROP TABLE jobs;
+            ALTER TABLE jobs_new RENAME TO jobs;
+        """)
+        conn.execute("PRAGMA foreign_keys = ON")
+        conn.commit()
     conn.commit()
     conn.close()
 
