@@ -12,6 +12,44 @@ def _client():
     base_url, api_key, _ = _cfg()
     return OpenAI(base_url=base_url, api_key=api_key)
 
+
+def list_models(base_url=None, api_key=None, timeout=25):
+    base_url = base_url or _cfg()[0]
+    api_key = api_key or _cfg()[1]
+    client = OpenAI(base_url=base_url, api_key=api_key, timeout=timeout)
+    resp = client.models.list()
+    ids = []
+    for m in resp.data:
+        mid = getattr(m, "id", None)
+        if mid:
+            ids.append(mid)
+    return sorted(set(ids))
+
+
+def test_connection(timeout=60):
+    import time
+    base_url, api_key, model = _cfg()
+    client = OpenAI(base_url=base_url, api_key=api_key, timeout=timeout)
+    started = time.time()
+    models = []
+    try:
+        models = [m.id for m in client.models.list().data]
+    except Exception:  # noqa: BLE001
+        models = []
+    resp = client.chat.completions.create(
+        model=model,
+        messages=[{"role": "user", "content": "Balas satu kata: halo"}],
+        max_tokens=30,
+    )
+    return {
+        "base_url": base_url,
+        "model": model,
+        "models": len(models),
+        "seconds": round(time.time() - started, 2),
+        "reply": (resp.choices[0].message.content or "").strip(),
+    }
+
+
 PROMPT_TEMPLATE = """{system_prompt}
 
 Gaya bahasa: {gaya}

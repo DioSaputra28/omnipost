@@ -4,17 +4,28 @@
 {% block hsub %}Base URL, API key, dan model OpenAI-compatible{% endblock %}
 {% from "base.html" import icon %}
 {% block body %}
-<div class="card" style="max-width:640px">
+<div class="card" style="max-width:680px">
 <h2>{{ icon('cog-6-tooth') }} Koneksi AI</h2>
 <p class="sub">API tersimpan: <strong>{{masked}}</strong>. Default OpenAI: <span class="mono">https://api.openai.com/v1</span>. Kalau API key dikosongkan, dipakai yang dari .env.</p>
 <form class="f" method="post">
-<label class="lb">Base URL</label><input class="in" name="ai_base_url" value="{{cfg.ai_base_url}}" placeholder="https://api.openai.com/v1" required/>
-<label class="lb">API Key</label><input class="in" name="ai_api_key" value="{{cfg.ai_api_key}}" placeholder="sk-..." required/>
-<label class="lb">Model</label><input class="in" name="ai_model" value="{{cfg.ai_model}}" placeholder="gpt-4o-mini" required/>
-<div class="frow">
-<button class="btn btn-pri" name="test" value="0">Simpan</button>
-<button class="btn btn-ghost" name="test" value="1">Simpan + Test koneksi</button>
+<label class="lb">Base URL</label>
+<input class="in" name="ai_base_url" value="{{cfg.ai_base_url}}" placeholder="https://api.openai.com/v1" required/>
+
+<label class="lb">API Key</label>
+<input class="in" name="ai_api_key" value="{{cfg.ai_api_key}}" placeholder="sk-..." required/>
+
+<label class="lb">Model{% if model_count %} <span style="color:var(--outline);font-weight:400">— {{model_count}} model terdaftar, ketik buat cari</span>{% endif %}</label>
+<input class="in" name="ai_model" value="{{cfg.ai_model}}" placeholder="gpt-4o-mini" list="ai-models" required autocomplete="off"/>
+<datalist id="ai-models">
+{% for m in models %}<option value="{{m}}"></option>{% endfor %}
+</datalist>
+
+<div class="frow" style="margin-top:14px">
+<button class="btn btn-pri" name="action" value="save">Simpan</button>
+<button class="btn btn-ghost" name="action" value="models">{{ icon('arrow-path') }}<span>Muat daftar model</span></button>
+<button class="btn btn-ghost" name="action" value="test">Simpan + Test koneksi</button>
 </div>
 </form>
+<p class="sub" style="margin:14px 0 0">Tombol <strong>Muat daftar model</strong> memanggil <span class="mono">GET /models</span> pakai base URL + key di atas, lalu hasilnya jadi pilihan dropdown di kolom Model. Kalau endpoint tidak punya <span class="mono">/models</span>, isi nama model manual tetap bisa.</p>
 </div>
 {% endblock %}

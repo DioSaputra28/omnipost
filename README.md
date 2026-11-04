@@ -85,7 +85,15 @@ DEDUP_DAYS=14
 
 ### 1. Setting AI (sekali saja)
 
-Buka **Setting AI**: isi Base URL (default `https://api.openai.com/v1`), API Key (`sk-...`), Model (`gpt-4o-mini`). Protokol OpenAI-compatible — bisa diganti ke provider lain yang support `/chat/completions` cukup dengan ganti base URL + model. Klik **Simpan + Test koneksi** untuk verifikasi. Kalau API key dikosongkan, dipakai yang dari `.env`.
+Buka **Setting AI**: isi Base URL (default `https://api.openai.com/v1`), API Key (`sk-...`), lalu Model.
+
+- **Muat daftar model** — tombol ini memanggil `GET /models` di base URL pakai key yang diisi, lalu hasilnya disimpan sebagai pilihan dropdown (datalist) di kolom Model. Jumlah model yang ditemukan ditampilkan di label. Cocok buat provider/tunnel yang punya ratusan model — tinggal ketik buat nyari
+- **Simpan + Test koneksi** — cek `/models` + satu chat completion kecil, lalu lapor base URL, model, jumlah model, dan durasi
+- Kalau endpoint tidak punya `/models`, isi nama model manual tetap bisa
+- Protokol OpenAI-compatible — bisa dipakai untuk provider apa pun yang support `/chat/completions`
+- Kalau API key dikosongkan, dipakai yang dari `.env`
+
+Pesan error dibuat spesifik: 401 (key ditolak), 402/403 (butuh saldo/paket), 404 (model tidak ada di endpoint — pakai Muat daftar model), 410 (model retired), 429 (kena limit), timeout/koneksi gagal.
 
 ### 2. Tambah akun sosmed
 
@@ -187,7 +195,7 @@ Semua tugas browser memakai satu `LOCK` global — posting dan scraping tidak pe
 | `products` | produk affiliate: nama, link Shopee, deskripsi, kategori, aktif |
 | `jobs` | satu baris tiap postingan: caption AI, status, `posted_at`, `screenshot_path`, `error`, `link_status`, `link_added_at` |
 | `post_metrics` | metrik per job (unik 1 baris/job): `post_url`, views, likes, replies, reposts, shares, `checked_at`, `error` |
-| `settings` | key-value: config AI + `autolink_enabled/metric/threshold/window_hours` |
+| `settings` | key-value: config AI (`ai_base_url`, `ai_api_key`, `ai_model`, cache `ai_models`) + `autolink_enabled/metric/threshold/window_hours` |
 
 Semua kolom baru ditambahkan otomatis lewat migrasi `init_db()` saat start — aman untuk database lama.
 
@@ -232,7 +240,11 @@ omnipost/
 | Cookies "tidak works / dilempar ke login" | cookies basi atau salah tab | login ulang di browser, pastikan di tab yang sudah login, export ulang |
 | Cookies "domain tidak cocok" | export dari situs lain | buka platform yang benar di tab login, baru export |
 | Akun status error, posting gagal | sesi mati / kena logout platform | klik Login Ulang di detail akun |
-| Generate gagal / test koneksi gagal | base URL / key / model salah | cek Setting AI → Test koneksi, pastikan model tersedia di provider |
+| Generate gagal / test koneksi gagal | base URL / key / model salah | cek Setting AI → **Muat daftar model**, pilih model dari daftar, lalu Test koneksi |
+| Test AI: "Model tidak tersedia di endpoint ini (404)" | nama model tidak ada di provider (contoh `gpt-4o-mini` di tunnel yang cuma punya `gpt-oss-120b`) | klik **Muat daftar model**, pilih salah satu dari dropdown |
+| Test AI: "API key ditolak (401)" | key salah / kadaluarsa / bukan untuk base URL itu | cek ulang key dan base URL |
+| Test AI: "butuh saldo/paket (402/403)" | model berbayar di provider itu | pilih model gratis atau isi saldo |
+| Test AI: model retired (410) | model sudah dipensiunkan provider | pilih model lain dari daftar |
 | Scheduler tidak posting | di luar jam aktif / belum due / produk habis kena dedup | cek Jadwal: jam aktif, kuota, tambah produk baru |
 | Browser login tidak nongol (VPS) | headless tanpa display | butuh VNC/RDP; atau pakai cara import cookies saja |
 | Metrik 0 semua / "postingan tidak ketemu" | caption postingan berbeda jauh dari data job, atau post sudah dihapus | klik **Cek** per baris; kalau post memang dihapus, angkanya akan tetap 0 |

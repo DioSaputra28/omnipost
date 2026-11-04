@@ -1,1 +1,2 @@
 - Prefers graceful error handling: never expose raw 500/stack traces to end users; show a friendly message and keep detailed diagnosable internal logs (error ID, request context, traceback). Confidence: 0.85
+- Wants project documentation (README) kept updated to reflect every new feature/behavior change, not left stale after implementation. Confidence: 0.6

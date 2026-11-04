@@ -43,14 +43,39 @@ def _req_ctx_safe():
 
 def _friendly(e):
     msg = str(e)
+    low = msg.lower()
+    try:
+        import openai
+        if isinstance(e, openai.AuthenticationError):
+            return "API key ditolak (401). Cek lagi key-nya atau base URL-nya."
+        if isinstance(e, openai.PermissionDeniedError):
+            return "Akses ditolak endpoint AI (402/403). Kemungkinan butuh saldo/paket di provider itu."
+        if isinstance(e, openai.NotFoundError):
+            return ("Model tidak tersedia di endpoint ini (404). Klik \"Muat daftar model\" buat lihat pilihan yang ada, "
+                    "lalu pilih salah satu.")
+        if isinstance(e, openai.RateLimitError):
+            return "Kena limit/kuota provider AI (429). Tunggu sebentar atau ganti model."
+        if isinstance(e, openai.APITimeoutError):
+            return "Endpoint AI tidak menjawab dalam batas waktu. Coba lagi atau ganti base URL."
+        if isinstance(e, openai.APIConnectionError):
+            return "Tidak bisa konek ke base URL AI. Cek alamat/tunnel-nya masih hidup."
+        if isinstance(e, openai.APIStatusError):
+            code = getattr(e, "status_code", 0)
+            if code == 410:
+                return "Model itu sudah di-retired provider (410). Pilih model lain dari daftar."
+            return f"Endpoint AI menolak permintaan (HTTP {code}): {msg[:200]}"
+    except Exception:  # noqa: BLE001
+        pass
     if "Executable doesn't exist" in msg or "Chromium belum terinstall" in msg:
         return "Browser Chromium belum terinstall. Jalankan: .venv/bin/python -m playwright install chromium"
-    if "Timeout" in type(e).__name__ or "timeout" in msg.lower()[:100]:
-        return "Koneksi ke platform timeout, coba lagi sebentar."
-    if "proxy" in msg.lower()[:200]:
+    if "Timeout" in type(e).__name__ or "timeout" in low[:100]:
+        return "Koneksi timeout, coba lagi sebentar."
+    if "proxy" in low[:200]:
         return "Proxy bermasalah, cek setting proxy akun ini."
     if "sesi mati" in msg or "storage_state" in msg or "belum login" in msg:
         return msg[:300]
+    if "no active credentials" in low:
+        return "Provider menolak kredensial untuk model itu. Pilih model lain dari daftar (klik Muat daftar model)."
     return "Terjadi kesalahan internal, sudah tercatat di Log Error. Coba lagi."
 
 def login_required(fn):
@@ -614,27 +639,63 @@ def post_now():
     flash(f"job #{jid} gagal: {err}" if err else f"job #{jid} posted!")
     return redirect(url_for("index"))
 
+def _ai_models_cached():
+    try:
+        return json.loads(get_setting("ai_models", "") or "[]")
+    except (ValueError, TypeError):
+        return []
+
 @app.route("/setting-ai", methods=["GET", "POST"])
 @login_required
 def setting_ai():
     if request.method == "POST":
-        set_setting("ai_base_url", request.form.get("ai_base_url", "").strip() or "https://api.openai.com/v1")
-        set_setting("ai_api_key", request.form.get("ai_api_key", "").strip())
-        set_setting("ai_model", request.form.get("ai_model", "").strip() or "gpt-4o-mini")
-        if request.form.get("test") == "1":
+        base_url = request.form.get("ai_base_url", "").strip() or "https://api.openai.com/v1"
+        api_key = request.form.get("ai_api_key", "").strip()
+        model = request.form.get("ai_model", "").strip() or "gpt-4o-mini"
+        set_setting("ai_base_url", base_url)
+        set_setting("ai_api_key", api_key)
+
+        if request.form.get("action") == "models":
+            from core.ai import list_models
             try:
-                base_url, _, model = _cfg()
-                generate_story("Kamu asisten.", "santai", "-", "Teh test", "produk dummy", "https://shopee.co.id/x")
-                flash(f"koneksi OK ke {base_url} model {model}")
+                ids = list_models(base_url, api_key)
+            except Exception as e:  # noqa: BLE001
+                _log_error("setting-ai/models", e)
+                flash("Gagal ambil daftar model: " + _friendly(e))
+                return redirect(url_for("setting_ai"))
+            if not ids:
+                flash("Endpoint tidak mengembalikan daftar model. Isi model manual masih bisa.")
+                return redirect(url_for("setting_ai"))
+            set_setting("ai_models", json.dumps(ids))
+            if model not in ids:
+                preferred = ["gpt-oss-120b", "groq/openai/gpt-oss-120b", "gpt-4o-mini", "gpt-4o",
+                             "gpt-4.1-mini", "claude-sonnet-4-5", "qwen3-32b"]
+                pick = next((p for p in preferred if p in ids), None)
+                model = pick or model
+            set_setting("ai_model", model)
+            flash(f"{len(ids)} model ditemukan. Pilih dari daftar di kolom Model.")
+            return redirect(url_for("setting_ai"))
+
+        set_setting("ai_model", model)
+        if request.form.get("action") == "test":
+            from core.ai import test_connection
+            try:
+                info = test_connection()
+                extra = f", {info['models']} model terdaftar" if info["models"] else ""
+                flash(f"koneksi OK ke {info['base_url']} model {info['model']} "
+                      f"({info['seconds']}s{extra}){', balasan: ' + info['reply'] if info['reply'] else ''}")
             except Exception as e:  # noqa: BLE001
                 _log_error("setting-ai/test", e)
                 flash("Test gagal: " + _friendly(e))
         else:
             flash("setting AI tersimpan")
         return redirect(url_for("setting_ai"))
+
     cfg = {"ai_base_url": get_setting("ai_base_url"), "ai_api_key": get_setting("ai_api_key"), "ai_model": get_setting("ai_model")}
     masked = (cfg["ai_api_key"][:4] + "..." + cfg["ai_api_key"][-4:]) if len(cfg["ai_api_key"]) > 8 else ("..." if cfg["ai_api_key"] else "-")
-    return render_template("setting_ai.html", cfg=cfg, masked=masked, nav="setting")
+    models = _ai_models_cached()
+    return render_template("setting_ai.html", cfg=cfg, masked=masked, models=models,
+                           model_count=len(models), nav="setting")
 
 @app.route("/jadwal")
 @login_required
