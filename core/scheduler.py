@@ -16,17 +16,45 @@ log = logging.getLogger("omnipost")
 LOCK = threading.Lock()
 DEDUP_DAYS = int(os.getenv("DEDUP_DAYS", "14"))
 
+def _num_terjual(val):
+    from core.metrics import _num
+    try:
+        return _num(val)
+    except Exception:  # noqa: BLE001
+        return 0
+
+def _score(p, max_komisi, max_terjual):
+    import math
+    komisi = float(p["komisi"] or 0)
+    terjual = _num_terjual(p["terjual"] or "")
+    k = (komisi / max_komisi) if max_komisi > 0 else 0
+    t = (math.log(1 + terjual) / math.log(1 + max_terjual)) if max_terjual > 0 else 0
+    return komisi * 0.6 * k + math.log(1 + terjual) * 0.4 * t
+
 def _pick_product(account_id):
     conn = get_conn()
     cutoff = (datetime.now() - timedelta(days=DEDUP_DAYS)).isoformat()
     rows = conn.execute(
         """SELECT p.* FROM products p WHERE p.aktif = 1 AND p.id NOT IN
            (SELECT product_id FROM jobs WHERE account_id = ? AND status = 'posted'
-            AND posted_at IS NOT NULL AND posted_at > ?)
-           ORDER BY RANDOM() LIMIT 1""",
-        (account_id, cutoff)).fetchone()
+            AND product_id IS NOT NULL AND posted_at IS NOT NULL AND posted_at > ?)
+           ORDER BY p.id DESC""",
+        (account_id, cutoff)).fetchall()
+    last = conn.execute(
+        """SELECT p.kategori FROM jobs j JOIN products p ON p.id = j.product_id
+           WHERE j.account_id = ? AND j.status = 'posted'
+           ORDER BY j.id DESC LIMIT 1""", (account_id,)).fetchone()
     conn.close()
-    return rows
+    if not rows:
+        return None
+    last_cat = (last["kategori"] if last else "") or ""
+    if last_cat:
+        rotated = [p for p in rows if (p["kategori"] or "") != last_cat]
+        if rotated:
+            rows = rotated
+    max_komisi = max(float(p["komisi"] or 0) for p in rows)
+    max_terjual = max(_num_terjual(p["terjual"] or "") for p in rows)
+    return max(rows, key=lambda p: _score(p, max_komisi, max_terjual))
 
 def _pick_post_type(acc):
     try:
@@ -58,6 +86,21 @@ def _pick_shape(account_id):
 DEDUP_HOOK_DAYS = int(os.getenv("DEDUP_HOOK_DAYS", "14"))
 
 TOPIC_ROTATE_DAYS = int(os.getenv("TOPIC_ROTATE_DAYS", "30"))
+BAIT_MIN_PER_WEEK = int(os.getenv("BAIT_MIN_PER_WEEK", "2"))
+BAIT_MAX_PER_WEEK = int(os.getenv("BAIT_MAX_PER_WEEK", "3"))
+
+def _bait_due(account_id):
+    cutoff = (datetime.now() - timedelta(days=7)).isoformat()
+    conn = get_conn()
+    used = conn.execute(
+        "SELECT COUNT(*) c FROM jobs WHERE account_id=? AND status='posted' AND has_bait=1 "
+        "AND posted_at IS NOT NULL AND posted_at > ?", (account_id, cutoff)).fetchone()["c"]
+    conn.close()
+    if used >= BAIT_MAX_PER_WEEK:
+        return False, used
+    if used < BAIT_MIN_PER_WEEK:
+        return True, used
+    return random.random() < 0.5, used
 
 def _pick_topic(account_id):
     cutoff = (datetime.now() - timedelta(days=TOPIC_ROTATE_DAYS)).isoformat()
@@ -137,6 +180,7 @@ def run_job_for_account(account_id, manual_product_id=None, force_type=None):
             if persona:
                 try:
                     part1 = part2 = bait = ""
+                    bait_ok, bait_count = _bait_due(account_id)
                     for attempt in range(3):
                         shape = _pick_shape(account_id)
                         p1, p2, bt = generate_story(
@@ -148,10 +192,10 @@ def run_job_for_account(account_id, manual_product_id=None, force_type=None):
                             extra_banned=pctx["banned"])
                         dup = find_duplicate_hook(hook_of(p1), recent_hooks)
                         if not dup:
-                            part1, part2, bait = p1, p2, bt
+                            part1, part2, bait = p1, p2, (bt if bait_ok else "")
                             break
                         log.info("hook mirip (percobaan %d): %r ~ %r", attempt + 1, hook_of(p1), dup)
-                        part1, part2, bait = p1, p2, bt
+                        part1, part2, bait = p1, p2, (bt if bait_ok else "")
                     if part1 and find_duplicate_hook(hook_of(part1), recent_hooks):
                         err = "hook mirip postingan 14 hari terakhir: %r" % hook_of(part1)
                         conn = get_conn()
@@ -203,10 +247,10 @@ def run_job_for_account(account_id, manual_product_id=None, force_type=None):
         conn = get_conn()
         cur = conn.execute(
             "INSERT INTO jobs (account_id, product_id, caption_hasil_ai, status, scheduled_at, post_type, "
-            "part1, part2, reply_bait, link_status, story_shape, hook) "
-            "VALUES (?,?,?, 'queued', ?, ?, ?, ?, ?, ?, ?, ?)",
+            "part1, part2, reply_bait, link_status, story_shape, hook, has_bait) "
+            "VALUES (?,?,?, 'queued', ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (account_id, (prod["id"] if prod else None), caption, datetime.now().isoformat(), ptype,
-             part1, part2, bait, link_state, shape, hook_of(part1)))
+             part1, part2, bait, link_state, shape, hook_of(part1), 1 if bait else 0))
         job_id = cur.lastrowid
         conn.commit()
         conn.close()

@@ -10,8 +10,9 @@ Web app personal-use (single user) untuk auto-posting produk affiliate Shopee ke
   - **Login manual via browser**: server bukakan Chromium ke halaman login, login manual (captcha/2FA bebas), klik simpan sesi
 - **Detail akun** — klik Detail di tiap kartu: persona, pengaturan (label, proxy, jadwal), user-agent, riwayat 20 job, hapus akun
 - **Persona per akun** (1 akun = 1 persona) — nama, **niche**, **profil (umur/kerjaan)**, gaya bahasa, system prompt, **3–5 contoh cerita bagus** (pisahkan dengan `---`), **larangan frasa** (ditegakkan validator, bukan cuma prompt), dan **contoh buruk** yang harus dihindari AI
-- **Produk affiliate** — CRUD + import CSV (`nama,link_shopee,deskripsi,kategori`)
+- **Produk affiliate** — CRUD + import CSV (`nama,link_shopee,deskripsi,kategori,harga,terjual,komisi`). Pemilihan produk **tidak acak**: skor `komisi*0.6 + log(terjual)*0.4` (dinormalisasi antar kandidat), plus **rotasi kategori** — kategori yang sama dengan postingan terakhir dilewati kalau ada pilihan lain
 - **AI storytelling 3 bagian** — AI diminta balas JSON: `part1` (hook ≤40 karakter + cerita, tanpa link/produk), `part2` (bridge social proof + nama produk + satu manfaat), `reply_bait` (pertanyaan A-vs-B buat memancing balasan). **Link tidak dipegang AI** — kode yang menempel di akhir `part2`, jadi posisinya nggak mungkin salah
+- **Reply-bait terjadwal** — pancingan balasan hanya dipasang 2–3x per minggu (`BAIT_MIN_PER_WEEK`/`BAIT_MAX_PER_WEEK`), bukan tiap post, biar nggak keliatan desperate. Status disimpan di `jobs.has_bait` dan dihitung dari 7 hari terakhir
 - **Anti-template** — 6 bentuk cerita diputar acak: spill produk setelah ditanya, narasi hari kerja, obrolan yang bikin penasaran, kejadian kecil, perbandingan sebelum-sesudah, kesalahan kecil + solusi. Bentuk disimpan di `jobs.story_shape`, dan bentuk yang dipakai 2 job terakhir otomatis dibuang dari pilihan
 - **Dedup hook 14 hari** — hook (baris pertama part1) disimpan di `jobs.hook`. Sebelum tayang, hook dibandingkan dengan hook 14 hari terakhir akun itu (kemiripan teks ≥0.8 dihitung pakai `SequenceMatcher`). Mirip → generate ulang otomatis (maks 3x, bentuk cerita ikut diganti); tetap mirip → job `failed` dengan alasan, tidak tayang
 - **Validator konten** — hasil AI dicek kode sebelum tayang: hook ≤40 karakter, part1 ≥180 karakter, tidak ada nominal harga (`Rp`, `50rb`, `1.000.000`), tidak ada kata terlarang (diskon, promo, murah, buruan, flash sale, wajib punya, pake produk ini, stok terbatas), tidak ada link di part1, dan part2 wajib menyebut nama produk. Gagal → retry maks 3x dengan feedback error dikirim balik ke AI; tetap gagal → job disimpan `failed` dan **tidak tayang**
@@ -75,6 +76,10 @@ OPENAI_API_KEY=sk-isi-api-key-lu
 AI_MODEL=gpt-4o-mini
 PORT=5000
 DEDUP_DAYS=14
+DEDUP_HOOK_DAYS=14
+TOPIC_ROTATE_DAYS=30
+BAIT_MIN_PER_WEEK=2
+BAIT_MAX_PER_WEEK=3
 ```
 
 ## Menjalankan
@@ -201,8 +206,8 @@ Semua tugas browser memakai satu `LOCK` global — posting dan scraping tidak pe
 | `social_accounts` | akun sosmed: platform, label, proxy, username asli, user-agent, status sesi, jadwal, `promo_ratio` |
 | `personas` | 1 persona per akun: nama, `niche`, `profil`, gaya bahasa, system prompt, contoh cerita (multi, dipisah `---`), `larangan`, `contoh_buruk` |
 | `topic_history` | topik cerita harian yang sudah dipakai per akun (`topic`, `used_at`) untuk rotasi 30 hari |
-| `products` | produk affiliate: nama, link Shopee, deskripsi, kategori, aktif |
-| `jobs` | satu baris tiap postingan: `post_type` (`promo`/`story`), `story_shape` (bentuk cerita yang dipakai), `hook` (baris pertama part1 untuk dedup), `part1`, `part2`, `reply_bait`, caption gabungan, status, `posted_at`, `screenshot_path`, `error`, `link_status`, `link_added_at`. `product_id` NULL untuk cerita harian |
+| `products` | produk affiliate: nama, link Shopee, deskripsi, kategori, aktif, `harga`, `terjual` (teks bebas: `1,2rb`/`1200`), `komisi` |
+| `jobs` | satu baris tiap postingan: `post_type` (`promo`/`story`), `story_shape` (bentuk cerita yang dipakai), `hook` (baris pertama part1 untuk dedup), `has_bait` (1 kalau reply-bait dipasang), `part1`, `part2`, `reply_bait`, caption gabungan, status, `posted_at`, `screenshot_path`, `error`, `link_status`, `link_added_at`. `product_id` NULL untuk cerita harian |
 | `post_metrics` | metrik per job (unik 1 baris/job): `post_url`, views, likes, replies, reposts, shares, `checked_at`, `error` |
 | `settings` | key-value: config AI (`ai_base_url`, `ai_api_key`, `ai_model`, cache `ai_models`) + `autolink_enabled/metric/threshold/window_hours` |
 
@@ -260,6 +265,8 @@ omnipost/
 | Metrik tidak update | semua post baru saja dicek (<3 jam) | tunggu putaran berikutnya atau klik **Perbarui Metrik** |
 | Link tidak nempel padahal ramai | mode belum diaktifkan, metrik belum refresh, atau lewat jendela | cek kartu "Link Otomatis Saat Ramai"; status `expired` artinya lewat batas waktu |
 | Caption AI jadi satu blok panjang / bukan 3 bagian | model tidak balas JSON valid atau JSON terpotong | kode retry 3x dengan feedback; kalau tetap gagal, job jadi `failed` dan tidak tayang. Naikkan `max_tokens` atau ganti model kalau sering |
+| Scheduler tidak posting padahal ada produk | semua produk kena dedup 14 hari / tidak aktif | tambah produk baru atau ubah `DEDUP_DAYS`; cek juga kategori produk terakhir (rotasi kategori) |
+| Reply-bait tidak muncul tiap post | memang dibatasi 2–3x/minggu | lihat `jobs.has_bait`; ubah `BAIT_MIN_PER_WEEK`/`BAIT_MAX_PER_WEEK` kalau mau lebih sering |
 | Cerita harian terasa berulang | topik sudah dipakai <30 hari | sistem otomatis melewati topik di `topic_history`; tambah topik baru di `DAILY_TOPICS` (`core/ai.py`) |
 | Job `failed` dengan alasan "hook mirip postingan 14 hari terakhir" | AI berkali-kali bikin hook yang mirip | sistem coba 3x dengan bentuk berbeda; generate manual dari halaman Generate untuk lihat hook-nya, atau tunggu >14 hari |
 | Cerita terasa itu-itu saja | bentuk cerita (shape) dipakai berulang | shape dipilih acak dan 2 bentuk terakhir dibuang otomatis; kalau masih monoton, tambah variasi di `STORY_SHAPES` (`core/ai.py`) |

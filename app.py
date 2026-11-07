@@ -41,6 +41,18 @@ def _req_ctx_safe():
     except Exception:  # noqa: BLE001
         return ""
 
+def _int_or_zero(val):
+    try:
+        return int(str(val or "0").replace(".", "").replace(",", "").strip() or 0)
+    except (TypeError, ValueError):
+        return 0
+
+def _float_or_zero(val):
+    try:
+        return float(str(val or "0").replace(".", "").replace(",", ".").strip() or 0)
+    except (TypeError, ValueError):
+        return 0
+
 def _friendly(e):
     msg = str(e)
     low = msg.lower()
@@ -567,8 +579,11 @@ def produk():
                 for r in csv.DictReader(text):
                     if not (r.get("nama") or "").strip() or not (r.get("link_shopee") or "").strip():
                         continue
-                    conn.execute("INSERT INTO products (nama,link_shopee,deskripsi,kategori) VALUES (?,?,?,?)",
-                                 (r.get("nama", ""), r.get("link_shopee", ""), r.get("deskripsi", ""), r.get("kategori", "")))
+                    conn.execute("INSERT INTO products (nama,link_shopee,deskripsi,kategori,harga,terjual,komisi) "
+                                 "VALUES (?,?,?,?,?,?,?)",
+                                 (r.get("nama", ""), r.get("link_shopee", ""), r.get("deskripsi", ""),
+                                  r.get("kategori", ""), _int_or_zero(r.get("harga")),
+                                  r.get("terjual", "") or "", _float_or_zero(r.get("komisi"))))
                     n += 1
                 conn.commit()
                 flash(f"{n} produk diimport dari CSV")
@@ -578,8 +593,12 @@ def produk():
                 if not nama or not link:
                     flash("nama dan link Shopee wajib diisi")
                 else:
-                    conn.execute("INSERT INTO products (nama,link_shopee,deskripsi,kategori) VALUES (?,?,?,?)",
-                                 (nama, link, request.form.get("deskripsi", ""), request.form.get("kategori", "")))
+                    conn.execute("INSERT INTO products (nama,link_shopee,deskripsi,kategori,harga,terjual,komisi) "
+                                 "VALUES (?,?,?,?,?,?,?)",
+                                 (nama, link, request.form.get("deskripsi", ""), request.form.get("kategori", ""),
+                                  _int_or_zero(request.form.get("harga")),
+                                  request.form.get("terjual", "") or "",
+                                  _float_or_zero(request.form.get("komisi"))))
                     conn.commit()
                     flash("produk ditambahkan")
         except sqlite3.Error as e:

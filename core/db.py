@@ -39,7 +39,10 @@ CREATE TABLE IF NOT EXISTS products (
     link_shopee TEXT NOT NULL,
     deskripsi TEXT DEFAULT '',
     kategori TEXT DEFAULT '',
-    aktif INTEGER DEFAULT 1
+    aktif INTEGER DEFAULT 1,
+    harga INTEGER DEFAULT 0,
+    terjual TEXT DEFAULT '',
+    komisi REAL DEFAULT 0
 );
 CREATE TABLE IF NOT EXISTS jobs (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -116,6 +119,17 @@ def init_db():
             conn.commit()
     if "post_type" not in jcols:
         conn.execute("ALTER TABLE jobs ADD COLUMN post_type TEXT DEFAULT 'promo'")
+        conn.commit()
+    prcols = [r["name"] for r in conn.execute("PRAGMA table_info(products)").fetchall()]
+    if "harga" not in prcols:
+        conn.execute("ALTER TABLE products ADD COLUMN harga INTEGER DEFAULT 0")
+    if "terjual" not in prcols:
+        conn.execute("ALTER TABLE products ADD COLUMN terjual TEXT DEFAULT ''")
+    if "komisi" not in prcols:
+        conn.execute("ALTER TABLE products ADD COLUMN komisi REAL DEFAULT 0")
+    conn.commit()
+    if "has_bait" not in jcols:
+        conn.execute("ALTER TABLE jobs ADD COLUMN has_bait INTEGER DEFAULT 0")
         conn.commit()
     for col in ["part1", "part2", "reply_bait", "story_shape", "hook"]:
         if col not in jcols:

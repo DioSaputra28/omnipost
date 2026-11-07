@@ -13,10 +13,15 @@
 <label class="lb">Link Shopee affiliate</label><input class="in" name="link_shopee" placeholder="https://shopee.co.id/..." required/>
 <label class="lb">Deskripsi (ini produk apa, buat apa)</label><textarea class="in" name="deskripsi" rows="3"></textarea>
 <label class="lb">Kategori</label><input class="in" name="kategori" placeholder="kategori"/>
+<div class="frow">
+<div><label class="lb">Harga (Rp)</label><input class="in" name="harga" type="number" min="0" placeholder="50000"/></div>
+<div><label class="lb">Terjual</label><input class="in" name="terjual" placeholder="1,2rb / 1200"/></div>
+<div><label class="lb">Komisi (Rp/sale)</label><input class="in" name="komisi" type="number" min="0" step="0.01" placeholder="7500"/></div>
+</div>
 <button class="btn btn-pri" style="width:auto">Tambah</button>
 </form>
 <form class="f" method="post" enctype="multipart/form-data" style="margin-top:16px;border-top:1px solid var(--oline);padding-top:16px">
-<label class="lb">Import CSV (kolom: nama,link_shopee,deskripsi,kategori)</label>
+<label class="lb">Import CSV (kolom: nama,link_shopee,deskripsi,kategori,harga,terjual,komisi — 3 terakhir opsional)</label>
 <input class="in" type="file" name="csv" accept=".csv"/>
 <button class="btn btn-ghost btn-sm" style="width:auto">Import CSV</button>
 </form>
@@ -24,8 +29,8 @@
 <div class="card">
 <h2>{{ icon('shopping-bag') }} List Produk ({{rows|length}})</h2>
 <p class="sub">Produk aktif ikut antrean scheduler.</p>
-<table class="tbl"><tr><th>ID</th><th>Nama</th><th>Link</th><th>Deskripsi</th></tr>
-{% for r in rows %}<tr><td>{{r.id}}</td><td>{{r.nama}}</td><td><a class="shop-link" href="{{r.link_shopee}}">link</a></td><td>{{r.deskripsi[:120]}}</td></tr>{% endfor %}
+<table class="tbl"><tr><th>ID</th><th>Nama</th><th>Kategori</th><th>Harga</th><th>Terjual</th><th>Komisi</th><th>Link</th></tr>
+{% for r in rows %}<tr><td>{{r.id}}</td><td>{{r.nama}}</td><td>{{r.kategori or '-'}}</td><td>{{r.harga or '-'}}</td><td>{{r.terjual or '-'}}</td><td>{{r.komisi or '-'}}</td><td><a class="shop-link" href="{{r.link_shopee}}">link</a></td></tr>{% endfor %}
 </table>
 </div>
 </div>
