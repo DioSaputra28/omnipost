@@ -14,8 +14,8 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.exceptions import HTTPException, NotFound
 
 from core.db import get_conn, init_db, get_setting, set_setting
-from core.ai import generate_story, generate_daily_story, _cfg, StoryValidationError
-from core.scheduler import start_scheduler, run_job_for_account, _pick_shape
+from core.ai import (generate_story, generate_daily_story, _cfg, StoryValidationError, hook_of, find_duplicate_hook)
+from core.scheduler import start_scheduler, run_job_for_account, _pick_shape, _recent_hooks
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger("omnipost")
@@ -624,10 +624,15 @@ def generate():
         elif per and prod:
             try:
                 shape = _pick_shape(aid)
+                avoid = _recent_hooks(aid)
                 p1, p2, bait = generate_story(per["system_prompt"], per["gaya_bahasa"], per["contoh_cerita"],
-                                              prod["nama"], prod["deskripsi"], prod["link_shopee"], shape=shape)
+                                              prod["nama"], prod["deskripsi"], prod["link_shopee"],
+                                              shape=shape, avoid_hooks=avoid)
+                dup = find_duplicate_hook(hook_of(p1), avoid)
+                if dup:
+                    flash(f"hook mirip postingan sebelumnya ({dup!r}) — pertimbangkan generate ulang")
                 out = {"part1": p1, "part2": p2 + ("\n" + prod["link_shopee"] if p2 else ""),
-                       "reply_bait": bait, "shape": shape}
+                       "reply_bait": bait, "shape": shape, "dup": dup}
             except StoryValidationError as ve:
                 _log_error("generate/validasi", ve)
                 flash("Hasil AI ditolak validator: " + "; ".join(ve.errors) + ". Coba generate ulang.")

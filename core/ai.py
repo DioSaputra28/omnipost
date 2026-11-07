@@ -1,5 +1,6 @@
 import os
 import re
+from difflib import SequenceMatcher
 import random
 from openai import OpenAI
 
@@ -170,6 +171,25 @@ def validate_story(part1, part2, nama_produk="", ):
     return errs
 
 
+def hook_of(part1):
+    return ((part1 or "").split("\n")[0] or "").strip()
+
+
+def _norm_hook(text):
+    return re.sub(r"[^a-z0-9 ]+", " ", (text or "").lower()).strip()
+
+
+def hook_similarity(a, b):
+    return SequenceMatcher(None, _norm_hook(a), _norm_hook(b)).ratio()
+
+
+def find_duplicate_hook(hook, recent_hooks, threshold=0.8):
+    for old in recent_hooks or []:
+        if old and hook_similarity(hook, old) >= threshold:
+            return old
+    return ""
+
+
 def _enforce_hook(part1, limit=40):
     text = (part1 or "").strip()
     if not text:
@@ -199,7 +219,7 @@ def _hook_too_long(part1, limit=40):
     return len(first) > limit
 
 
-def generate_story(system_prompt, gaya, contoh, nama, deskripsi, link=None, shape=None):
+def generate_story(system_prompt, gaya, contoh, nama, deskripsi, link=None, shape=None, avoid_hooks=None):
     import logging
     _, _, model = _cfg()
     client = _client()
@@ -207,6 +227,10 @@ def generate_story(system_prompt, gaya, contoh, nama, deskripsi, link=None, shap
                                       contoh=contoh or "-", nama=nama,
                                       deskripsi=deskripsi or "-",
                                       shape=shape or random.choice(STORY_SHAPES))
+    avoid = [h for h in (avoid_hooks or []) if h][:6]
+    if avoid:
+        user_msg += ("\n\nHook yang SUDAH DIPAKAI 14 hari terakhir (jangan bikin yang mirip, "
+                     "ganti angle/kejadiannya):\n" + "\n".join(f"- {h}" for h in avoid))
     base_msgs = [{"role": "user", "content": user_msg}]
     best = None
     last_errs = []

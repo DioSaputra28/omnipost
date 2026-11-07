@@ -106,7 +106,7 @@ def init_db():
     if "post_type" not in jcols:
         conn.execute("ALTER TABLE jobs ADD COLUMN post_type TEXT DEFAULT 'promo'")
         conn.commit()
-    for col in ["part1", "part2", "reply_bait", "story_shape"]:
+    for col in ["part1", "part2", "reply_bait", "story_shape", "hook"]:
         if col not in jcols:
             conn.execute(f"ALTER TABLE jobs ADD COLUMN {col} TEXT DEFAULT ''")
             conn.commit()

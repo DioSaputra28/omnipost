@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 from apscheduler.schedulers.background import BackgroundScheduler
 
 from core.db import get_conn, get_setting
-from core.ai import generate_story, generate_daily_story, StoryValidationError, STORY_SHAPES
+from core.ai import generate_story, generate_daily_story, StoryValidationError, STORY_SHAPES, hook_of, find_duplicate_hook
 from core.poster import post_to_platform, add_link_reply
 
 log = logging.getLogger("omnipost")
@@ -54,6 +54,17 @@ def _pick_shape(account_id):
     pool = [x for x in STORY_SHAPES if x not in recent]
     return random.choice(pool or STORY_SHAPES)
 
+DEDUP_HOOK_DAYS = int(os.getenv("DEDUP_HOOK_DAYS", "14"))
+
+def _recent_hooks(account_id, days=DEDUP_HOOK_DAYS):
+    cutoff = (datetime.now() - timedelta(days=days)).isoformat()
+    conn = get_conn()
+    rows = conn.execute(
+        "SELECT hook FROM jobs WHERE account_id=? AND hook != '' AND posted_at IS NOT NULL "
+        "AND posted_at > ? ORDER BY id DESC LIMIT 30", (account_id, cutoff)).fetchall()
+    conn.close()
+    return [r["hook"] for r in rows]
+
 def _get_persona(account_id):
     conn = get_conn()
     row = conn.execute("SELECT * FROM personas WHERE account_id = ? LIMIT 1", (account_id,)).fetchone()
@@ -92,12 +103,37 @@ def run_job_for_account(account_id, manual_product_id=None, force_type=None):
         if ptype == "promo":
             autolink = (get_setting("autolink_enabled", "0") or "0") == "1"
             link_state = "pending" if autolink else "inline"
+            recent_hooks = _recent_hooks(account_id)
             shape = _pick_shape(account_id)
             if persona:
                 try:
-                    part1, part2, bait = generate_story(
-                        persona["system_prompt"], persona["gaya_bahasa"], persona["contoh_cerita"],
-                        prod["nama"], prod["deskripsi"], prod["link_shopee"], shape=shape)
+                    part1 = part2 = bait = ""
+                    for attempt in range(3):
+                        shape = _pick_shape(account_id)
+                        p1, p2, bt = generate_story(
+                            persona["system_prompt"], persona["gaya_bahasa"], persona["contoh_cerita"],
+                            prod["nama"], prod["deskripsi"], prod["link_shopee"],
+                            shape=shape, avoid_hooks=recent_hooks)
+                        dup = find_duplicate_hook(hook_of(p1), recent_hooks)
+                        if not dup:
+                            part1, part2, bait = p1, p2, bt
+                            break
+                        log.info("hook mirip (percobaan %d): %r ~ %r", attempt + 1, hook_of(p1), dup)
+                        part1, part2, bait = p1, p2, bt
+                    if part1 and find_duplicate_hook(hook_of(part1), recent_hooks):
+                        err = "hook mirip postingan 14 hari terakhir: %r" % hook_of(part1)
+                        conn = get_conn()
+                        cur = conn.execute(
+                            "INSERT INTO jobs (account_id, product_id, caption_hasil_ai, status, scheduled_at, "
+                            "post_type, link_status, error, hook, story_shape) "
+                            "VALUES (?,?,?, 'failed', ?, 'promo', 'none', ?, ?, ?)",
+                            (account_id, prod["id"], part1, datetime.now().isoformat(), err,
+                             hook_of(part1), shape))
+                        jid = cur.lastrowid
+                        conn.commit()
+                        conn.close()
+                        log.warning("job %s dibatalkan: %s", jid, err)
+                        return jid, err
                 except StoryValidationError as ve:
                     err = "validasi konten gagal: " + "; ".join(ve.errors)
                     conn = get_conn()
@@ -132,9 +168,10 @@ def run_job_for_account(account_id, manual_product_id=None, force_type=None):
         conn = get_conn()
         cur = conn.execute(
             "INSERT INTO jobs (account_id, product_id, caption_hasil_ai, status, scheduled_at, post_type, "
-            "part1, part2, reply_bait, link_status, story_shape) VALUES (?,?,?, 'queued', ?, ?, ?, ?, ?, ?, ?)",
+            "part1, part2, reply_bait, link_status, story_shape, hook) "
+            "VALUES (?,?,?, 'queued', ?, ?, ?, ?, ?, ?, ?, ?)",
             (account_id, (prod["id"] if prod else None), caption, datetime.now().isoformat(), ptype,
-             part1, part2, bait, link_state, shape))
+             part1, part2, bait, link_state, shape, hook_of(part1)))
         job_id = cur.lastrowid
         conn.commit()
         conn.close()
