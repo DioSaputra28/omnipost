@@ -12,6 +12,7 @@ Web app personal-use (single user) untuk auto-posting produk affiliate Shopee ke
 - **Persona per akun** — nama, gaya bahasa, system prompt, contoh cerita (few-shot). 1 akun = 1 persona
 - **Produk affiliate** — CRUD + import CSV (`nama,link_shopee,deskripsi,kategori`)
 - **AI storytelling 3 bagian** — AI diminta balas JSON: `part1` (hook ≤40 karakter + cerita, tanpa link/produk), `part2` (bridge social proof + nama produk + satu manfaat), `reply_bait` (pertanyaan A-vs-B buat memancing balasan). **Link tidak dipegang AI** — kode yang menempel di akhir `part2`, jadi posisinya nggak mungkin salah
+- **Anti-template** — 6 bentuk cerita diputar acak: spill produk setelah ditanya, narasi hari kerja, obrolan yang bikin penasaran, kejadian kecil, perbandingan sebelum-sesudah, kesalahan kecil + solusi. Bentuk disimpan di `jobs.story_shape`, dan bentuk yang dipakai 2 job terakhir otomatis dibuang dari pilihan
 - **Validator konten** — hasil AI dicek kode sebelum tayang: hook ≤40 karakter, part1 ≥180 karakter, tidak ada nominal harga (`Rp`, `50rb`, `1.000.000`), tidak ada kata terlarang (diskon, promo, murah, buruan, flash sale, wajib punya, pake produk ini, stok terbatas), tidak ada link di part1, dan part2 wajib menyebut nama produk. Gagal → retry maks 3x dengan feedback error dikirim balik ke AI; tetap gagal → job disimpan `failed` dan **tidak tayang**
 - **Normalisasi otomatis** — kalau model menulis part1 satu baris panjang, kode memecah hook di batas kalimat/kata (≤40 karakter). `\n` yang ter-escape ganda juga dinormalisasi
 - **Preview terstruktur** — halaman Generate AI menampilkan hasil per bagian (1/2, 2/2, pancingan balasan)
@@ -198,7 +199,7 @@ Semua tugas browser memakai satu `LOCK` global — posting dan scraping tidak pe
 | `social_accounts` | akun sosmed: platform, label, proxy, username asli, user-agent, status sesi, jadwal, `promo_ratio` |
 | `personas` | 1 persona per akun (gaya bahasa, system prompt, contoh cerita) |
 | `products` | produk affiliate: nama, link Shopee, deskripsi, kategori, aktif |
-| `jobs` | satu baris tiap postingan: `post_type` (`promo`/`story`), `part1`, `part2`, `reply_bait`, caption gabungan, status, `posted_at`, `screenshot_path`, `error`, `link_status`, `link_added_at`. `product_id` NULL untuk cerita harian |
+| `jobs` | satu baris tiap postingan: `post_type` (`promo`/`story`), `story_shape` (bentuk cerita yang dipakai), `part1`, `part2`, `reply_bait`, caption gabungan, status, `posted_at`, `screenshot_path`, `error`, `link_status`, `link_added_at`. `product_id` NULL untuk cerita harian |
 | `post_metrics` | metrik per job (unik 1 baris/job): `post_url`, views, likes, replies, reposts, shares, `checked_at`, `error` |
 | `settings` | key-value: config AI (`ai_base_url`, `ai_api_key`, `ai_model`, cache `ai_models`) + `autolink_enabled/metric/threshold/window_hours` |
 
@@ -256,6 +257,7 @@ omnipost/
 | Metrik tidak update | semua post baru saja dicek (<3 jam) | tunggu putaran berikutnya atau klik **Perbarui Metrik** |
 | Link tidak nempel padahal ramai | mode belum diaktifkan, metrik belum refresh, atau lewat jendela | cek kartu "Link Otomatis Saat Ramai"; status `expired` artinya lewat batas waktu |
 | Caption AI jadi satu blok panjang / bukan 3 bagian | model tidak balas JSON valid atau JSON terpotong | kode retry 3x dengan feedback; kalau tetap gagal, job jadi `failed` dan tidak tayang. Naikkan `max_tokens` atau ganti model kalau sering |
+| Cerita terasa itu-itu saja | bentuk cerita (shape) dipakai berulang | shape dipilih acak dan 2 bentuk terakhir dibuang otomatis; kalau masih monoton, tambah variasi di `STORY_SHAPES` (`core/ai.py`) |
 | Job `failed` dengan alasan "validasi konten gagal" | AI melanggar aturan (harga/kata promo/hook panjang/produk tidak disebut) | lihat pesan error di riwayat job. Generate ulang; kalau konsisten, perbaiki system prompt persona atau deskripsi produk |
 | Hook part1 kepanjangan (>40 karakter) | model mengabaikan aturan hook | kode memecah hook otomatis di batas kalimat/kata; retry juga memberi feedback eksplisit |
 | Tombol Post disabled di Threads | kartu preview link masih render | kode menunggu kartu muncul, menghapusnya, lalu resolve ulang koordinat Post; kalau tetap gagal, fallback ke post teks + link di reply |

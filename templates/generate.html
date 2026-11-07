@@ -24,6 +24,7 @@
 <h2>{{ icon('document-text') }} Hasil Generate</h2>
 <p class="sub">Kalau cocok, posting manual dari dashboard atau biarkan scheduler yang jalan.</p>
 {% if out %}
+{% if out.shape %}<div style="margin-bottom:10px"><span class="pill pill-pri">bentuk: {{out.shape}}</span></div>{% endif %}
 {% if out.part1 %}<div class="cap" style="margin-bottom:10px"><div style="font-size:11px;color:var(--outline);margin-bottom:4px">1/2 — cerita utama</div>{{out.part1}}</div>{% endif %}
 {% if out.part2 %}<div class="cap" style="margin-bottom:10px"><div style="font-size:11px;color:var(--outline);margin-bottom:4px">2/2 — bridge + produk + link</div>{{out.part2}}</div>{% endif %}
 {% if out.reply_bait %}<div class="cap" style="margin-bottom:10px"><div style="font-size:11px;color:var(--outline);margin-bottom:4px">pancingan balasan</div>{{out.reply_bait}}</div>{% endif %}

@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 from apscheduler.schedulers.background import BackgroundScheduler
 
 from core.db import get_conn, get_setting
-from core.ai import generate_story, generate_daily_story, StoryValidationError
+from core.ai import generate_story, generate_daily_story, StoryValidationError, STORY_SHAPES
 from core.poster import post_to_platform, add_link_reply
 
 log = logging.getLogger("omnipost")
@@ -44,6 +44,16 @@ def _pick_post_type(acc):
         return "promo"
     return "promo" if random.randint(1, 100) <= ratio else "story"
 
+def _pick_shape(account_id):
+    conn = get_conn()
+    rows = conn.execute(
+        "SELECT story_shape FROM jobs WHERE account_id=? AND status='posted' AND post_type='promo' "
+        "AND story_shape != '' ORDER BY id DESC LIMIT 2", (account_id,)).fetchall()
+    conn.close()
+    recent = {r["story_shape"] for r in rows}
+    pool = [x for x in STORY_SHAPES if x not in recent]
+    return random.choice(pool or STORY_SHAPES)
+
 def _get_persona(account_id):
     conn = get_conn()
     row = conn.execute("SELECT * FROM personas WHERE account_id = ? LIMIT 1", (account_id,)).fetchone()
@@ -77,15 +87,17 @@ def run_job_for_account(account_id, manual_product_id=None, force_type=None):
 
         persona = _get_persona(account_id)
         part1 = part2 = bait = ""
+        shape = ""
         link_state = ""
         if ptype == "promo":
             autolink = (get_setting("autolink_enabled", "0") or "0") == "1"
             link_state = "pending" if autolink else "inline"
+            shape = _pick_shape(account_id)
             if persona:
                 try:
                     part1, part2, bait = generate_story(
                         persona["system_prompt"], persona["gaya_bahasa"], persona["contoh_cerita"],
-                        prod["nama"], prod["deskripsi"], prod["link_shopee"])
+                        prod["nama"], prod["deskripsi"], prod["link_shopee"], shape=shape)
                 except StoryValidationError as ve:
                     err = "validasi konten gagal: " + "; ".join(ve.errors)
                     conn = get_conn()
@@ -120,9 +132,9 @@ def run_job_for_account(account_id, manual_product_id=None, force_type=None):
         conn = get_conn()
         cur = conn.execute(
             "INSERT INTO jobs (account_id, product_id, caption_hasil_ai, status, scheduled_at, post_type, "
-            "part1, part2, reply_bait, link_status) VALUES (?,?,?, 'queued', ?, ?, ?, ?, ?, ?)",
+            "part1, part2, reply_bait, link_status, story_shape) VALUES (?,?,?, 'queued', ?, ?, ?, ?, ?, ?, ?)",
             (account_id, (prod["id"] if prod else None), caption, datetime.now().isoformat(), ptype,
-             part1, part2, bait, link_state))
+             part1, part2, bait, link_state, shape))
         job_id = cur.lastrowid
         conn.commit()
         conn.close()

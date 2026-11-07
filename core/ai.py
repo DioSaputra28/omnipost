@@ -52,6 +52,15 @@ def test_connection(timeout=60):
     }
 
 
+STORY_SHAPES = [
+    "spill produk setelah ditanya orang",
+    "narasi hari kerja + satu detail produk nyempil",
+    "obrolan dengan orang lain yang bikin penasaran",
+    "kejadian kecil yang bikin sadar butuh barang itu",
+    "perbandingan sebelum-sesudah",
+    "kesalahan kecil yang akhirnya ketemu solusinya",
+]
+
 PROMPT_TEMPLATE = """{system_prompt}
 
 Gaya bahasa: {gaya}
@@ -61,6 +70,8 @@ Contoh cerita (tirukan gayanya, jangan copy):
 Produk:
 - Nama: {nama}
 - Deskripsi: {deskripsi}
+
+Bentuk cerita yang WAJIB dipakai (jangan nyimpang): {shape}
 
 Balas HANYA dengan JSON valid, tanpa markdown:
 {{"part1": "...", "part2": "...", "reply_bait": "..."}}
@@ -188,13 +199,14 @@ def _hook_too_long(part1, limit=40):
     return len(first) > limit
 
 
-def generate_story(system_prompt, gaya, contoh, nama, deskripsi, link=None):
+def generate_story(system_prompt, gaya, contoh, nama, deskripsi, link=None, shape=None):
     import logging
     _, _, model = _cfg()
     client = _client()
     user_msg = PROMPT_TEMPLATE.format(system_prompt=system_prompt, gaya=gaya or "-",
                                       contoh=contoh or "-", nama=nama,
-                                      deskripsi=deskripsi or "-")
+                                      deskripsi=deskripsi or "-",
+                                      shape=shape or random.choice(STORY_SHAPES))
     base_msgs = [{"role": "user", "content": user_msg}]
     best = None
     last_errs = []
