@@ -12,6 +12,8 @@ Web app personal-use (single user) untuk auto-posting produk affiliate Shopee ke
 - **Persona per akun** — nama, gaya bahasa, system prompt, contoh cerita (few-shot). 1 akun = 1 persona
 - **Produk affiliate** — CRUD + import CSV (`nama,link_shopee,deskripsi,kategori`)
 - **AI storytelling 3 bagian** — AI diminta balas JSON: `part1` (hook ≤40 karakter + cerita, tanpa link/produk), `part2` (bridge social proof + nama produk + satu manfaat), `reply_bait` (pertanyaan A-vs-B buat memancing balasan). **Link tidak dipegang AI** — kode yang menempel di akhir `part2`, jadi posisinya nggak mungkin salah
+- **Validator konten** — hasil AI dicek kode sebelum tayang: hook ≤40 karakter, part1 ≥180 karakter, tidak ada nominal harga (`Rp`, `50rb`, `1.000.000`), tidak ada kata terlarang (diskon, promo, murah, buruan, flash sale, wajib punya, pake produk ini, stok terbatas), tidak ada link di part1, dan part2 wajib menyebut nama produk. Gagal → retry maks 3x dengan feedback error dikirim balik ke AI; tetap gagal → job disimpan `failed` dan **tidak tayang**
+- **Normalisasi otomatis** — kalau model menulis part1 satu baris panjang, kode memecah hook di batas kalimat/kata (≤40 karakter). `\n` yang ter-escape ganda juga dinormalisasi
 - **Preview terstruktur** — halaman Generate AI menampilkan hasil per bagian (1/2, 2/2, pancingan balasan)
 - **Setting AI** — protokol OpenAI-compatible (base URL + API key + model dari web UI, ada tombol **Muat daftar model** dari `GET /models`)
 - **Campuran konten: promosi + cerita harian** — tiap akun punya **Promosi (%)**. Persentase menentukan porsi postingan jualan vs cerita keseharian (curhat/observasi, tanpa produk & link). Dijaga anti-monoton: 2 promosi beruntun dipaksa jadi cerita, 2 cerita beruntun dipaksa promosi. Kalau produk habis kena dedup, otomatis jadi cerita (kalau dipaksa promosi, dapat pesan jelas)
@@ -253,8 +255,9 @@ omnipost/
 | Metrik 0 semua / "postingan tidak ketemu" | caption postingan berbeda jauh dari data job, atau post sudah dihapus | klik **Cek** per baris; kalau post memang dihapus, angkanya akan tetap 0 |
 | Metrik tidak update | semua post baru saja dicek (<3 jam) | tunggu putaran berikutnya atau klik **Perbarui Metrik** |
 | Link tidak nempel padahal ramai | mode belum diaktifkan, metrik belum refresh, atau lewat jendela | cek kartu "Link Otomatis Saat Ramai"; status `expired` artinya lewat batas waktu |
-| Caption AI jadi satu blok panjang / bukan 3 bagian | model tidak balas JSON valid | kode fallback memecah per paragraf. Kalau sering, ganti model (beberapa model kecil malas format JSON) |
-| Hook part1 kepanjangan (>40 karakter) | model mengabaikan aturan hook | kode retry sekali dengan suhu lebih rendah; kalau masih panjang, dipakai apa adanya |
+| Caption AI jadi satu blok panjang / bukan 3 bagian | model tidak balas JSON valid atau JSON terpotong | kode retry 3x dengan feedback; kalau tetap gagal, job jadi `failed` dan tidak tayang. Naikkan `max_tokens` atau ganti model kalau sering |
+| Job `failed` dengan alasan "validasi konten gagal" | AI melanggar aturan (harga/kata promo/hook panjang/produk tidak disebut) | lihat pesan error di riwayat job. Generate ulang; kalau konsisten, perbaiki system prompt persona atau deskripsi produk |
+| Hook part1 kepanjangan (>40 karakter) | model mengabaikan aturan hook | kode memecah hook otomatis di batas kalimat/kata; retry juga memberi feedback eksplisit |
 | Tombol Post disabled di Threads | kartu preview link masih render | kode menunggu kartu muncul, menghapusnya, lalu resolve ulang koordinat Post; kalau tetap gagal, fallback ke post teks + link di reply |
 
 ## Keamanan

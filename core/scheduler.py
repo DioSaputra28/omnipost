@@ -1,3 +1,4 @@
+import logging
 import os
 import random
 import threading
@@ -6,8 +7,10 @@ from datetime import datetime, timedelta
 from apscheduler.schedulers.background import BackgroundScheduler
 
 from core.db import get_conn, get_setting
-from core.ai import generate_story, generate_daily_story
+from core.ai import generate_story, generate_daily_story, StoryValidationError
 from core.poster import post_to_platform, add_link_reply
+
+log = logging.getLogger("omnipost")
 
 LOCK = threading.Lock()
 DEDUP_DAYS = int(os.getenv("DEDUP_DAYS", "14"))
@@ -79,9 +82,22 @@ def run_job_for_account(account_id, manual_product_id=None, force_type=None):
             autolink = (get_setting("autolink_enabled", "0") or "0") == "1"
             link_state = "pending" if autolink else "inline"
             if persona:
-                part1, part2, bait = generate_story(
-                    persona["system_prompt"], persona["gaya_bahasa"], persona["contoh_cerita"],
-                    prod["nama"], prod["deskripsi"], prod["link_shopee"])
+                try:
+                    part1, part2, bait = generate_story(
+                        persona["system_prompt"], persona["gaya_bahasa"], persona["contoh_cerita"],
+                        prod["nama"], prod["deskripsi"], prod["link_shopee"])
+                except StoryValidationError as ve:
+                    err = "validasi konten gagal: " + "; ".join(ve.errors)
+                    conn = get_conn()
+                    cur = conn.execute(
+                        "INSERT INTO jobs (account_id, product_id, caption_hasil_ai, status, scheduled_at, "
+                        "post_type, link_status, error) VALUES (?,?,?, 'failed', ?, 'promo', 'none', ?)",
+                        (account_id, prod["id"], "", datetime.now().isoformat(), err))
+                    jid = cur.lastrowid
+                    conn.commit()
+                    conn.close()
+                    log.warning("job %s dibatalkan: %s", jid, err)
+                    return jid, err
             if not part1:
                 part1 = f"Hari ini nemu {prod['nama']} yang bagus banget."
                 part2 = f"Ternyata belinya di sini."

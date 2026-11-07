@@ -1,4 +1,5 @@
 import os
+import re
 import random
 from openai import OpenAI
 
@@ -84,7 +85,7 @@ ATURAN reply_bait:
 """
 
 
-def _parse_parts(raw):
+def _parse_parts(raw, strict=False):
     import json as _json
     import re as _re
     text = (raw or "").strip()
@@ -102,17 +103,84 @@ def _parse_parts(raw):
             except ValueError:
                 data = None
     if isinstance(data, dict):
-        part1 = str(data.get("part1") or "").strip()
-        part2 = str(data.get("part2") or "").strip()
-        bait = str(data.get("reply_bait") or "").strip()
+        def _unfold(t):
+            t = str(t or "").strip()
+            if "\\n" in t or "\\t" in t:
+                t = t.replace("\\r\\n", "\n").replace("\\n", "\n").replace("\\t", "\t")
+            return t
+        part1 = _unfold(data.get("part1"))
+        part2 = _unfold(data.get("part2"))
+        bait = _unfold(data.get("reply_bait"))
         if bait.lower() in ('""', "''", "-", "tidak", "none", "null"):
             bait = ""
         if part1:
             return part1, part2, bait
+    if strict:
+        return None, None, None
     blocks = [b.strip() for b in (raw or "").split("\n\n") if b.strip()]
     part1 = blocks[0] if blocks else (raw or "").strip()
     part2 = blocks[1] if len(blocks) > 1 else ""
     return part1, part2, ""
+
+
+BANNED = ["diskon", "promo", "murah", "buruan", "flash sale",
+          "wajib punya", "pake produk ini", "stok terbatas"]
+
+_PRICE_RE = re.compile(r"\b\d{1,3}(\.\d{3})+\b|\bRp\s?\d|\b\d+\s?(rb|ribu|k)\b", re.I)
+
+
+class StoryValidationError(Exception):
+    def __init__(self, errors):
+        self.errors = errors
+        super().__init__("; ".join(errors))
+
+
+def validate_story(part1, part2, nama_produk="", ):
+    errs = []
+    part1 = part1 or ""
+    part2 = part2 or ""
+    hook = part1.split("\n")[0].strip()
+    if len(hook) > 40:
+        errs.append(f"hook {len(hook)} char, maks 40")
+    if len(part1) < 180:
+        errs.append("part1 terlalu tipis (min 180 char)")
+    if _PRICE_RE.search(part1 + " " + part2):
+        errs.append("ada nominal harga")
+    both = (part1 + " " + part2).lower()
+    for w in BANNED:
+        if w in both:
+            errs.append(f"kata terlarang: {w}")
+    if "http" in part1.lower():
+        errs.append("link bocor ke part1")
+    if nama_produk:
+        first = nama_produk.split()[0].lower()
+        if first not in part2.lower():
+            errs.append(f"part2 tidak menyebut produk ({first})")
+    return errs
+
+
+def _enforce_hook(part1, limit=40):
+    text = (part1 or "").strip()
+    if not text:
+        return text
+    first, _, rest = text.partition("\n")
+    first = first.strip()
+    if len(first) <= limit:
+        return text
+    body = (first + ("\n" + rest if rest else "")).strip()
+    m = re.match(r"^(.+?[.!?])\s+", body)
+    if m and len(m.group(1)) <= limit:
+        hook = m.group(1)
+        remainder = body[m.end():].strip()
+    else:
+        cut = body.rfind(" ", 0, limit)
+        if cut <= 10:
+            cut = limit
+        hook = body[:cut].strip().rstrip(",;:-")
+        remainder = body[cut:].strip()
+    if not remainder:
+        return hook
+    return hook + "\n" + remainder
 
 
 def _hook_too_long(part1, limit=40):
@@ -127,32 +195,39 @@ def generate_story(system_prompt, gaya, contoh, nama, deskripsi, link=None):
     user_msg = PROMPT_TEMPLATE.format(system_prompt=system_prompt, gaya=gaya or "-",
                                       contoh=contoh or "-", nama=nama,
                                       deskripsi=deskripsi or "-")
+    base_msgs = [{"role": "user", "content": user_msg}]
     best = None
-    for attempt in range(2):
-        msgs = [{"role": "user", "content": user_msg}]
-        if attempt == 1:
+    last_errs = []
+    for attempt in range(3):
+        msgs = list(base_msgs)
+        if attempt > 0:
             msgs.append({"role": "assistant", "content": '{"part1": "'})
             msgs.append({"role": "user", "content":
-                         "Inget: baris pertama part1 adalah HOOK, MAKSIMAL 40 karakter, "
-                         "lalu newline \\n sebelum kalimat berikutnya. Ulangi JSON-nya."})
+                         "Perbaiki: " + "; ".join(last_errs) +
+                         ". Balas ulang HANYA JSON valid dengan format yang sama, tanpa markdown."})
         resp = client.chat.completions.create(
             model=model,
             messages=msgs,
-            temperature=0.9 if attempt == 0 else 0.6,
-            max_tokens=1500,
+            temperature=max(0.4, 0.9 - attempt * 0.2),
+            max_tokens=2500,
         )
-        part1, part2, bait = _parse_parts(resp.choices[0].message.content or "")
+        part1, part2, bait = _parse_parts(resp.choices[0].message.content or "", strict=True)
         if part1 and part2:
+            part1 = _enforce_hook(part1)
+        if not part1 or not part2:
+            errs = ["JSON tidak valid atau terpotong (part1/part2 kosong)"]
+            last_errs = errs
+            logging.getLogger("omnipost").info("generate_story attempt %d: %s", attempt + 1, errs[0])
+            continue
+        errs = validate_story(part1, part2, nama)
+        if not errs:
+            return part1, part2, bait
+        last_errs = errs
+        if part1 and part2 and best is None:
             best = (part1, part2, bait)
-            if not _hook_too_long(part1):
-                return best
-        elif part1 and not best:
-            best = (part1, part2, bait)
-    if best is None:
-        return "", "", ""
-    if _hook_too_long(best[0]):
-        logging.getLogger("omnipost").info("generate_story: hook masih >40 karakter setelah retry")
-    return best
+        logging.getLogger("omnipost").info(
+            "generate_story attempt %d gagal validasi: %s", attempt + 1, "; ".join(errs))
+    raise StoryValidationError(last_errs or ["hasil AI tidak valid"])
 
 
 DAILY_TOPICS = [
