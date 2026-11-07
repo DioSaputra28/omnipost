@@ -38,9 +38,15 @@
 <p class="sub">Gaya cerita AI khusus akun ini. 1 akun = 1 persona.</p>
 <form class="f" method="post" action="/akun/{{acc.id}}/persona">
 <label class="lb">Nama persona</label><input class="in" name="nama" value="{{persona.nama if persona else ''}}" placeholder="mis: emak-emak santai" required/>
+<div class="frow">
+<div><label class="lb">Niche</label><input class="in" name="niche" value="{{persona.niche if persona else ''}}" placeholder="mis: camilan rumahan, dapur, parenting"/></div>
+<div><label class="lb">Profil (umur / kerjaan)</label><input class="in" name="profil" value="{{persona.profil if persona else ''}}" placeholder="mis: 27 tahun, admin kantor di Jakarta"/></div>
+</div>
 <label class="lb">Gaya bahasa</label><input class="in" name="gaya_bahasa" value="{{persona.gaya_bahasa if persona else ''}}" placeholder="mis: santai, ceplas-ceplos"/>
 <label class="lb">System prompt</label><textarea class="in" name="system_prompt" rows="4" placeholder="kamu adalah ... yang cerita natural..." required>{{persona.system_prompt if persona else ''}}</textarea>
-<label class="lb">Contoh cerita (few-shot)</label><textarea class="in" name="contoh_cerita" rows="4">{{persona.contoh_cerita if persona else ''}}</textarea>
+<label class="lb">Contoh cerita bagus (3–5 contoh, pisahkan dengan baris <span class="mono">---</span>)</label><textarea class="in" name="contoh_cerita" rows="7" placeholder="contoh 1&#10;---&#10;contoh 2&#10;---&#10;contoh 3">{{persona.contoh_cerita if persona else ''}}</textarea>
+<label class="lb">Larangan frasa (pisahkan koma atau baris baru)</label><textarea class="in" name="larangan" rows="3" placeholder="mis: bestie, gaes, auto cuan, healing">{{persona.larangan if persona else ''}}</textarea>
+<label class="lb">Contoh BURUK (yang harus dihindari)</label><textarea class="in" name="contoh_buruk" rows="4" placeholder="Tulis 1 contoh caption jelek: terlalu jualan, kaku, penuh kata promo...">{{persona.contoh_buruk if persona else ''}}</textarea>
 <button class="btn btn-pri" style="width:auto">Simpan Persona</button>
 </form>
 </div>

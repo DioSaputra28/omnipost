@@ -63,10 +63,11 @@ STORY_SHAPES = [
 ]
 
 PROMPT_TEMPLATE = """{system_prompt}
-
+{profil_line}{niche_line}
 Gaya bahasa: {gaya}
-Contoh cerita (tirukan gayanya, jangan copy):
+Contoh cerita bagus (tirukan gayanya, jangan copy):
 {contoh}
+{larangan_block}{buruk_block}
 
 Produk:
 - Nama: {nama}
@@ -147,7 +148,7 @@ class StoryValidationError(Exception):
         super().__init__("; ".join(errors))
 
 
-def validate_story(part1, part2, nama_produk="", ):
+def validate_story(part1, part2, nama_produk="", extra_banned=None):
     errs = []
     part1 = part1 or ""
     part2 = part2 or ""
@@ -159,8 +160,9 @@ def validate_story(part1, part2, nama_produk="", ):
     if _PRICE_RE.search(part1 + " " + part2):
         errs.append("ada nominal harga")
     both = (part1 + " " + part2).lower()
-    for w in BANNED:
-        if w in both:
+    banned_all = list(BANNED) + [b.strip().lower() for b in (extra_banned or []) if b.strip()]
+    for w in banned_all:
+        if w and w in both:
             errs.append(f"kata terlarang: {w}")
     if "http" in part1.lower():
         errs.append("link bocor ke part1")
@@ -219,14 +221,32 @@ def _hook_too_long(part1, limit=40):
     return len(first) > limit
 
 
-def generate_story(system_prompt, gaya, contoh, nama, deskripsi, link=None, shape=None, avoid_hooks=None):
+def _persona_blocks(profil="", niche="", larangan="", contoh_buruk=""):
+    profil_line = f"Profil: {profil}\n" if (profil or "").strip() else ""
+    niche_line = f"Niche: {niche}\n" if (niche or "").strip() else ""
+    larangan_block = ""
+    bans = [x.strip() for x in re.split(r"[,\n;]+", larangan or "") if x.strip()]
+    if bans:
+        larangan_block = "\nLarangan frasa untuk akun ini (jangan pernah pakai): " + ", ".join(bans) + "\n"
+    buruk_block = ""
+    if (contoh_buruk or "").strip():
+        buruk_block = ("\nContoh BURUK (jangan tiru gaya, struktur, atau kalimatnya):\n"
+                       + contoh_buruk.strip() + "\n")
+    return profil_line, niche_line, larangan_block, buruk_block
+
+
+def generate_story(system_prompt, gaya, contoh, nama, deskripsi, link=None, shape=None, avoid_hooks=None,
+                   profil="", niche="", larangan="", contoh_buruk="", extra_banned=None):
     import logging
     _, _, model = _cfg()
     client = _client()
+    profil_line, niche_line, larangan_block, buruk_block = _persona_blocks(profil, niche, larangan, contoh_buruk)
     user_msg = PROMPT_TEMPLATE.format(system_prompt=system_prompt, gaya=gaya or "-",
                                       contoh=contoh or "-", nama=nama,
                                       deskripsi=deskripsi or "-",
-                                      shape=shape or random.choice(STORY_SHAPES))
+                                      shape=shape or random.choice(STORY_SHAPES),
+                                      profil_line=profil_line, niche_line=niche_line,
+                                      larangan_block=larangan_block, buruk_block=buruk_block)
     avoid = [h for h in (avoid_hooks or []) if h][:6]
     if avoid:
         user_msg += ("\n\nHook yang SUDAH DIPAKAI 14 hari terakhir (jangan bikin yang mirip, "
@@ -255,7 +275,7 @@ def generate_story(system_prompt, gaya, contoh, nama, deskripsi, link=None, shap
             last_errs = errs
             logging.getLogger("omnipost").info("generate_story attempt %d: %s", attempt + 1, errs[0])
             continue
-        errs = validate_story(part1, part2, nama)
+        errs = validate_story(part1, part2, nama, extra_banned=extra_banned)
         if not errs:
             return part1, part2, bait
         last_errs = errs
@@ -294,11 +314,11 @@ DAILY_TOPICS = [
 ]
 
 DAILY_TEMPLATE = """{system_prompt}
-
+{profil_line}{niche_line}
 Gaya bahasa: {gaya}
-Contoh cerita (tirukan gayanya, jangan copy):
+Contoh cerita bagus (tirukan gayanya, jangan copy):
 {contoh}
-
+{larangan_block}
 Tulis satu postingan Threads tentang: {topik}
 
 Aturan:
@@ -308,12 +328,15 @@ Aturan:
 - Bahasa Indonesia santai, sesuai gaya di atas.
 """
 
-def generate_daily_story(system_prompt, gaya, contoh, topik=None):
+def generate_daily_story(system_prompt, gaya, contoh, topik=None, profil="", niche="", larangan=""):
     _, _, model = _cfg()
     client = _client()
     topik = topik or random.choice(DAILY_TOPICS)
+    profil_line, niche_line, larangan_block, _ = _persona_blocks(profil, niche, larangan)
     user_msg = DAILY_TEMPLATE.format(system_prompt=system_prompt, gaya=gaya or "-",
-                                     contoh=contoh or "-", topik=topik)
+                                     contoh=contoh or "-", topik=topik,
+                                     profil_line=profil_line, niche_line=niche_line,
+                                     larangan_block=larangan_block)
     resp = client.chat.completions.create(
         model=model,
         messages=[{"role": "user", "content": user_msg}],

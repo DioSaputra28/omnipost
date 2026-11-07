@@ -59,6 +59,12 @@ CREATE TABLE IF NOT EXISTS settings (
     key TEXT PRIMARY KEY,
     value TEXT DEFAULT ''
 );
+CREATE TABLE IF NOT EXISTS topic_history (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    account_id INTEGER NOT NULL REFERENCES social_accounts(id) ON DELETE CASCADE,
+    topic TEXT NOT NULL,
+    used_at TEXT DEFAULT ''
+);
 CREATE TABLE IF NOT EXISTS post_metrics (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     job_id INTEGER UNIQUE NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
@@ -94,6 +100,11 @@ def init_db():
     conn.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('autolink_metric', 'views')")
     conn.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('autolink_threshold', '100')")
     conn.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('autolink_window_hours', '24')")
+    pcols = [r["name"] for r in conn.execute("PRAGMA table_info(personas)").fetchall()]
+    for col in ["niche", "profil", "larangan", "contoh_buruk"]:
+        if col not in pcols:
+            conn.execute(f"ALTER TABLE personas ADD COLUMN {col} TEXT DEFAULT ''")
+            conn.commit()
     if "promo_ratio" not in cols:
         conn.execute("ALTER TABLE social_accounts ADD COLUMN promo_ratio INTEGER DEFAULT 70")
         conn.commit()

@@ -7,7 +7,8 @@ from datetime import datetime, timedelta
 from apscheduler.schedulers.background import BackgroundScheduler
 
 from core.db import get_conn, get_setting
-from core.ai import generate_story, generate_daily_story, StoryValidationError, STORY_SHAPES, hook_of, find_duplicate_hook
+from core.ai import (generate_story, generate_daily_story, StoryValidationError, STORY_SHAPES,
+                     hook_of, find_duplicate_hook, DAILY_TOPICS)
 from core.poster import post_to_platform, add_link_reply
 
 log = logging.getLogger("omnipost")
@@ -55,6 +56,33 @@ def _pick_shape(account_id):
     return random.choice(pool or STORY_SHAPES)
 
 DEDUP_HOOK_DAYS = int(os.getenv("DEDUP_HOOK_DAYS", "14"))
+
+TOPIC_ROTATE_DAYS = int(os.getenv("TOPIC_ROTATE_DAYS", "30"))
+
+def _pick_topic(account_id):
+    cutoff = (datetime.now() - timedelta(days=TOPIC_ROTATE_DAYS)).isoformat()
+    conn = get_conn()
+    used = {r["topic"] for r in conn.execute(
+        "SELECT topic FROM topic_history WHERE account_id=? AND used_at > ?", (account_id, cutoff)).fetchall()}
+    pool = [t for t in DAILY_TOPICS if t not in used] or list(DAILY_TOPICS)
+    topic = random.choice(pool)
+    conn.execute("INSERT INTO topic_history (account_id, topic, used_at) VALUES (?,?,?)",
+                 (account_id, topic, datetime.now().isoformat()))
+    conn.commit()
+    conn.close()
+    return topic
+
+def _persona_ctx(persona):
+    if not persona:
+        return {"profil": "", "niche": "", "larangan": "", "contoh_buruk": "", "banned": []}
+    def g(key):
+        try:
+            return persona[key] or ""
+        except (IndexError, KeyError):
+            return ""
+    bans = [x.strip() for x in __import__("re").split(r"[,\n;]+", g("larangan")) if x.strip()]
+    return {"profil": g("profil"), "niche": g("niche"), "larangan": g("larangan"),
+            "contoh_buruk": g("contoh_buruk"), "banned": bans}
 
 def _recent_hooks(account_id, days=DEDUP_HOOK_DAYS):
     cutoff = (datetime.now() - timedelta(days=days)).isoformat()
@@ -105,6 +133,7 @@ def run_job_for_account(account_id, manual_product_id=None, force_type=None):
             link_state = "pending" if autolink else "inline"
             recent_hooks = _recent_hooks(account_id)
             shape = _pick_shape(account_id)
+            pctx = _persona_ctx(persona)
             if persona:
                 try:
                     part1 = part2 = bait = ""
@@ -113,7 +142,10 @@ def run_job_for_account(account_id, manual_product_id=None, force_type=None):
                         p1, p2, bt = generate_story(
                             persona["system_prompt"], persona["gaya_bahasa"], persona["contoh_cerita"],
                             prod["nama"], prod["deskripsi"], prod["link_shopee"],
-                            shape=shape, avoid_hooks=recent_hooks)
+                            shape=shape, avoid_hooks=recent_hooks,
+                            profil=pctx["profil"], niche=pctx["niche"],
+                            larangan=pctx["larangan"], contoh_buruk=pctx["contoh_buruk"],
+                            extra_banned=pctx["banned"])
                         dup = find_duplicate_hook(hook_of(p1), recent_hooks)
                         if not dup:
                             part1, part2, bait = p1, p2, bt
@@ -159,8 +191,11 @@ def run_job_for_account(account_id, manual_product_id=None, force_type=None):
         else:
             link_state = "none"
             if persona:
+                pctx = _persona_ctx(persona)
                 caption = generate_daily_story(persona["system_prompt"], persona["gaya_bahasa"],
-                                               persona["contoh_cerita"])
+                                               persona["contoh_cerita"], topik=_pick_topic(account_id),
+                                               profil=pctx["profil"], niche=pctx["niche"],
+                                               larangan=pctx["larangan"])
             else:
                 caption = "Lagi pengen cerita random aja hari ini. Kalian gimana, hari ini berjalan lancar?"
             part1 = caption

@@ -501,14 +501,17 @@ def akun_persona(aid):
     try:
         conn = get_conn()
         cur = conn.execute("SELECT id FROM personas WHERE account_id=? LIMIT 1", (aid,)).fetchone()
+        vals = (nama, request.form.get("gaya_bahasa", ""), sys_prompt,
+                request.form.get("contoh_cerita", ""), request.form.get("niche", ""),
+                request.form.get("profil", ""), request.form.get("larangan", ""),
+                request.form.get("contoh_buruk", ""))
         if cur:
-            conn.execute("UPDATE personas SET nama=?, gaya_bahasa=?, system_prompt=?, contoh_cerita=? WHERE id=?",
-                         (nama, request.form.get("gaya_bahasa", ""),
-                          sys_prompt, request.form.get("contoh_cerita", ""), cur["id"]))
+            conn.execute("UPDATE personas SET nama=?, gaya_bahasa=?, system_prompt=?, contoh_cerita=?, "
+                         "niche=?, profil=?, larangan=?, contoh_buruk=? WHERE id=?", (*vals, cur["id"]))
         else:
-            conn.execute("INSERT INTO personas (account_id,nama,gaya_bahasa,system_prompt,contoh_cerita) VALUES (?,?,?,?,?)",
-                         (aid, nama, request.form.get("gaya_bahasa", ""),
-                          sys_prompt, request.form.get("contoh_cerita", "")))
+            conn.execute("INSERT INTO personas (account_id,nama,gaya_bahasa,system_prompt,contoh_cerita,"
+                         "niche,profil,larangan,contoh_buruk) VALUES (?,?,?,?,?,?,?,?,?)",
+                         (aid, *vals))
         conn.commit()
         conn.close()
     except sqlite3.Error as e:
@@ -614,8 +617,12 @@ def generate():
                 flash("akun ini belum punya persona, cerita harian butuh persona")
             else:
                 try:
+                    from core.scheduler import _persona_ctx, _pick_topic
+                    pctx = _persona_ctx(per)
                     out = {"part1": generate_daily_story(per["system_prompt"], per["gaya_bahasa"],
-                                                         per["contoh_cerita"]),
+                                                         per["contoh_cerita"], topik=_pick_topic(aid),
+                                                         profil=pctx["profil"], niche=pctx["niche"],
+                                                         larangan=pctx["larangan"]),
                            "part2": "", "reply_bait": ""}
                     picked_pid = 0
                 except Exception as e:  # noqa: BLE001
@@ -625,9 +632,14 @@ def generate():
             try:
                 shape = _pick_shape(aid)
                 avoid = _recent_hooks(aid)
+                from core.scheduler import _persona_ctx
+                pctx = _persona_ctx(per)
                 p1, p2, bait = generate_story(per["system_prompt"], per["gaya_bahasa"], per["contoh_cerita"],
                                               prod["nama"], prod["deskripsi"], prod["link_shopee"],
-                                              shape=shape, avoid_hooks=avoid)
+                                              shape=shape, avoid_hooks=avoid,
+                                              profil=pctx["profil"], niche=pctx["niche"],
+                                              larangan=pctx["larangan"], contoh_buruk=pctx["contoh_buruk"],
+                                              extra_banned=pctx["banned"])
                 dup = find_duplicate_hook(hook_of(p1), avoid)
                 if dup:
                     flash(f"hook mirip postingan sebelumnya ({dup!r}) — pertimbangkan generate ulang")
