@@ -271,3 +271,21 @@ def refresh_job(job_id):
         return False, str(e)[:200]
     finally:
         LOCK.release()
+
+
+def winning_angles(account_id, days=14, limit=3, min_posts=1):
+    cutoff = (datetime.now() - timedelta(days=days)).isoformat()
+    conn = get_conn()
+    rows = conn.execute(
+        """SELECT j.story_shape AS shape, AVG(m.views) AS avg_views, COUNT(*) AS n
+           FROM jobs j JOIN post_metrics m ON m.job_id = j.id
+           WHERE j.account_id = ? AND j.story_shape IS NOT NULL AND j.story_shape != ''
+             AND j.status = 'posted' AND j.posted_at IS NOT NULL AND j.posted_at > ?
+             AND m.checked_at != ''
+           GROUP BY j.story_shape
+           HAVING COUNT(*) >= ?
+           ORDER BY avg_views DESC, n DESC
+           LIMIT ?""",
+        (account_id, cutoff, max(1, int(min_posts)), limit)).fetchall()
+    conn.close()
+    return [r["shape"] for r in rows]

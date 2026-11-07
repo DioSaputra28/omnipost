@@ -649,7 +649,9 @@ def generate():
                     flash("Gagal generate: " + _friendly(e))
         elif per and prod:
             try:
-                shape = _pick_shape(aid)
+                from core.metrics import winning_angles
+                winning = winning_angles(aid)
+                shape = _pick_shape(aid, winning)
                 avoid = _recent_hooks(aid)
                 from core.scheduler import _persona_ctx
                 pctx = _persona_ctx(per)
@@ -658,12 +660,12 @@ def generate():
                                               shape=shape, avoid_hooks=avoid,
                                               profil=pctx["profil"], niche=pctx["niche"],
                                               larangan=pctx["larangan"], contoh_buruk=pctx["contoh_buruk"],
-                                              extra_banned=pctx["banned"])
+                                              extra_banned=pctx["banned"], winning=winning)
                 dup = find_duplicate_hook(hook_of(p1), avoid)
                 if dup:
                     flash(f"hook mirip postingan sebelumnya ({dup!r}) — pertimbangkan generate ulang")
                 out = {"part1": p1, "part2": p2 + ("\n" + prod["link_shopee"] if p2 else ""),
-                       "reply_bait": bait, "shape": shape, "dup": dup}
+                       "reply_bait": bait, "shape": shape, "dup": dup, "winning": winning}
             except StoryValidationError as ve:
                 _log_error("generate/validasi", ve)
                 flash("Hasil AI ditolak validator: " + "; ".join(ve.errors) + ". Coba generate ulang.")

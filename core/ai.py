@@ -74,6 +74,7 @@ Produk:
 - Deskripsi: {deskripsi}
 
 Bentuk cerita yang WAJIB dipakai (jangan nyimpang): {shape}
+{winning_block}
 
 Balas HANYA dengan JSON valid, tanpa markdown:
 {{"part1": "...", "part2": "...", "reply_bait": "..."}}
@@ -236,7 +237,7 @@ def _persona_blocks(profil="", niche="", larangan="", contoh_buruk=""):
 
 
 def generate_story(system_prompt, gaya, contoh, nama, deskripsi, link=None, shape=None, avoid_hooks=None,
-                   profil="", niche="", larangan="", contoh_buruk="", extra_banned=None):
+                   profil="", niche="", larangan="", contoh_buruk="", extra_banned=None, winning=None):
     import logging
     _, _, model = _cfg()
     client = _client()
@@ -246,7 +247,10 @@ def generate_story(system_prompt, gaya, contoh, nama, deskripsi, link=None, shap
                                       deskripsi=deskripsi or "-",
                                       shape=shape or random.choice(STORY_SHAPES),
                                       profil_line=profil_line, niche_line=niche_line,
-                                      larangan_block=larangan_block, buruk_block=buruk_block)
+                                      larangan_block=larangan_block, buruk_block=buruk_block,
+                                      winning_block=(
+                                          "\nBentuk cerita yang lagi perform di akun ini (prioritaskan): "
+                                          + "; ".join(winning) + "\n" if winning else ""))
     avoid = [h for h in (avoid_hooks or []) if h][:6]
     if avoid:
         user_msg += ("\n\nHook yang SUDAH DIPAKAI 14 hari terakhir (jangan bikin yang mirip, "

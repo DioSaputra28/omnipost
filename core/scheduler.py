@@ -73,15 +73,16 @@ def _pick_post_type(acc):
         return "promo"
     return "promo" if random.randint(1, 100) <= ratio else "story"
 
-def _pick_shape(account_id):
+def _pick_shape(account_id, winning=None):
     conn = get_conn()
     rows = conn.execute(
         "SELECT story_shape FROM jobs WHERE account_id=? AND status='posted' AND post_type='promo' "
         "AND story_shape != '' ORDER BY id DESC LIMIT 2", (account_id,)).fetchall()
     conn.close()
     recent = {r["story_shape"] for r in rows}
-    pool = [x for x in STORY_SHAPES if x not in recent]
-    return random.choice(pool or STORY_SHAPES)
+    pool = [x for x in STORY_SHAPES if x not in recent] or list(STORY_SHAPES)
+    hot = [x for x in (winning or []) if x in pool]
+    return random.choice(hot or pool)
 
 DEDUP_HOOK_DAYS = int(os.getenv("DEDUP_HOOK_DAYS", "14"))
 
@@ -175,21 +176,23 @@ def run_job_for_account(account_id, manual_product_id=None, force_type=None):
             autolink = (get_setting("autolink_enabled", "0") or "0") == "1"
             link_state = "pending" if autolink else "inline"
             recent_hooks = _recent_hooks(account_id)
-            shape = _pick_shape(account_id)
+            from core.metrics import winning_angles
+            winning = winning_angles(account_id)
+            shape = _pick_shape(account_id, winning)
             pctx = _persona_ctx(persona)
             if persona:
                 try:
                     part1 = part2 = bait = ""
                     bait_ok, bait_count = _bait_due(account_id)
                     for attempt in range(3):
-                        shape = _pick_shape(account_id)
+                        shape = _pick_shape(account_id, winning)
                         p1, p2, bt = generate_story(
                             persona["system_prompt"], persona["gaya_bahasa"], persona["contoh_cerita"],
                             prod["nama"], prod["deskripsi"], prod["link_shopee"],
                             shape=shape, avoid_hooks=recent_hooks,
                             profil=pctx["profil"], niche=pctx["niche"],
                             larangan=pctx["larangan"], contoh_buruk=pctx["contoh_buruk"],
-                            extra_banned=pctx["banned"])
+                            extra_banned=pctx["banned"], winning=winning)
                         dup = find_duplicate_hook(hook_of(p1), recent_hooks)
                         if not dup:
                             part1, part2, bait = p1, p2, (bt if bait_ok else "")
